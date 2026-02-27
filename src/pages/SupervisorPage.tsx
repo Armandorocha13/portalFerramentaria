@@ -181,19 +181,21 @@ export default function SupervisorPage() {
     return (
         <div className="min-h-screen bg-white">
             {/* Header */}
-            <header className="border-b border-slate-200">
-                <div className="max-w-5xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <img src="/logo.png" alt="FFA Infraestrutura" className="h-10" />
+            <header className="border-b border-slate-200 sticky top-0 bg-white z-50">
+                <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <img src="/logo.png" alt="FFA Infraestrutura" className="h-8 sm:h-10" />
                         <div>
-                            <h1 className="text-sm font-semibold text-slate-900">Gestão de Trocas</h1>
-                            <p className="text-xs text-slate-500">{usuario?.nome} · {usuario?.setor}</p>
+                            <h1 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">Gestão de Trocas</h1>
+                            <p className="text-[10px] sm:text-xs text-slate-500 truncate max-w-[120px] sm:max-w-none">
+                                {usuario?.nome.split(' ')[0]} · {usuario?.setor}
+                            </p>
                         </div>
                     </div>
                     <button
                         id="btn-logout"
                         onClick={logout}
-                        className="text-xs text-slate-500 hover:text-slate-900 border border-slate-200 rounded px-3 py-1.5 hover:border-slate-400 transition-colors"
+                        className="text-[11px] sm:text-xs text-slate-600 hover:text-slate-900 border border-slate-200 rounded px-2.5 py-1.5 hover:border-slate-400 transition-colors bg-white font-medium"
                     >
                         Sair
                     </button>
@@ -211,11 +213,11 @@ export default function SupervisorPage() {
                 )}
 
                 {/* Tabs */}
-                <div className="flex gap-0 border-b border-slate-200 mb-6">
+                <div className="flex overflow-x-auto no-scrollbar gap-0 border-b border-slate-200 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
                     <button
                         id="tab-nova"
                         onClick={() => setTabAtiva('nova')}
-                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${tabAtiva === 'nova'
+                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${tabAtiva === 'nova'
                             ? 'border-black text-slate-900'
                             : 'border-transparent text-slate-500 hover:text-slate-700'
                             }`}
@@ -225,7 +227,7 @@ export default function SupervisorPage() {
                     <button
                         id="tab-historico"
                         onClick={() => setTabAtiva('historico')}
-                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${tabAtiva === 'historico'
+                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${tabAtiva === 'historico'
                             ? 'border-black text-slate-900'
                             : 'border-transparent text-slate-500 hover:text-slate-700'
                             }`}
@@ -243,23 +245,23 @@ export default function SupervisorPage() {
                 {tabAtiva === 'nova' && (
                     <div>
                         {/* Stepper */}
-                        <div className="mb-8">
-                            <div className="flex items-center gap-1">
+                        <div className="mb-8 overflow-x-auto no-scrollbar -mx-4 px-4 sm:mx-0 sm:px-0">
+                            <div className="flex items-center min-w-max sm:min-w-0 sm:justify-between gap-1">
                                 {STEPS.map((label, i) => (
                                     <div key={i} className="flex items-center">
                                         <div className="flex items-center gap-1.5">
                                             <div
-                                                className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-medium transition-colors ${i < step
-                                                    ? 'bg-black text-white'
+                                                className={`w-7 h-7 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold transition-all ${i < step
+                                                    ? 'bg-emerald-500 text-white shadow-sm'
                                                     : i === step
-                                                        ? 'bg-black text-white'
+                                                        ? 'bg-black text-white shadow-md scale-110'
                                                         : 'bg-slate-100 text-slate-400'
                                                     }`}
                                             >
                                                 {i < step ? <IconCheck /> : i + 1}
                                             </div>
                                             <span
-                                                className={`text-xs hidden sm:inline ${i <= step ? 'text-slate-900 font-medium' : 'text-slate-400'
+                                                className={`text-[10px] sm:text-xs hidden md:inline whitespace-nowrap ${i <= step ? 'text-slate-900 font-bold' : 'text-slate-400 font-medium'
                                                     }`}
                                             >
                                                 {label}
@@ -267,7 +269,7 @@ export default function SupervisorPage() {
                                         </div>
                                         {i < STEPS.length - 1 && (
                                             <div
-                                                className={`w-6 sm:w-10 h-px mx-1 ${i < step ? 'bg-black' : 'bg-slate-200'
+                                                className={`w-4 sm:w-8 lg:w-12 h-[2px] mx-1 ${i < step ? 'bg-emerald-500' : 'bg-slate-200'
                                                     }`}
                                             />
                                         )}
@@ -288,30 +290,30 @@ export default function SupervisorPage() {
 
                         {/* ====== STEP 0: Identificação do Técnico ====== */}
                         {step === 0 && (
-                            <div className="border border-slate-200 rounded-lg p-6">
-                                <h2 className="text-base font-semibold text-slate-900 mb-1">Identificação do Técnico</h2>
-                                <p className="text-sm text-slate-500 mb-5">Informe a matrícula do colaborador que receberá a troca.</p>
-                                <form onSubmit={handleBuscarTecnico} className="flex gap-3 items-end">
-                                    <div className="flex-1">
-                                        <label htmlFor="input-matricula-tecnico" className="block text-xs font-medium text-slate-700 mb-1.5 uppercase tracking-wider">
+                            <div className="bg-white border border-slate-200 rounded-xl p-5 sm:p-8 shadow-sm">
+                                <h2 className="text-lg font-bold text-slate-900 mb-1">Identificação</h2>
+                                <p className="text-sm text-slate-500 mb-6">Informe a matrícula do colaborador.</p>
+                                <form onSubmit={handleBuscarTecnico} className="space-y-4">
+                                    <div>
+                                        <label htmlFor="input-matricula-tecnico" className="block text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1.5">
                                             Matrícula do Técnico
                                         </label>
                                         <input
                                             id="input-matricula-tecnico"
                                             type="text"
                                             value={form.tecnicoMatricula}
-                                            onChange={(e) => setForm((prev) => ({ ...prev, tecnicoMatricula: e.target.value }))}
+                                            onChange={(e) => setForm((prev) => ({ ...prev, tecnicoMatricula: e.target.value.toUpperCase() }))}
                                             placeholder="Ex: TEC001"
-                                            className="w-full px-3 py-2.5 border border-slate-200 rounded-md text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-slate-900 focus:ring-1 focus:ring-slate-900 transition-colors"
+                                            className="w-full px-4 py-3 border-2 border-slate-100 rounded-xl text-sm font-medium focus:outline-none focus:border-black transition-all"
                                             autoFocus
                                         />
                                     </div>
                                     <button
                                         id="btn-buscar-tecnico"
                                         type="submit"
-                                        className="bg-black text-white text-sm font-medium px-5 py-2.5 rounded-md hover:bg-slate-800 transition-colors flex items-center gap-1.5"
+                                        className="w-full sm:w-auto bg-black text-white text-sm font-bold px-8 py-3 rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 active:scale-95"
                                     >
-                                        Validar
+                                        Validar Técnico
                                         <IconArrowRight />
                                     </button>
                                 </form>
@@ -632,39 +634,69 @@ export default function SupervisorPage() {
                                 </button>
                             </div>
                         ) : (
-                            <div className="border border-slate-200 rounded-lg overflow-hidden">
-                                <div className="overflow-x-auto">
+                            <div className="bg-white border border-slate-200 rounded-xl overflow-hidden shadow-sm">
+                                {/* Desktop View */}
+                                <div className="hidden lg:block overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="border-b border-slate-200 bg-slate-50">
-                                                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">ID</th>
-                                                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Técnico</th>
-                                                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Saída</th>
-                                                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Entrada</th>
-                                                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Data</th>
-                                                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Prazo</th>
-                                                <th className="text-left px-4 py-3 text-xs font-medium text-slate-500 uppercase tracking-wider">Status</th>
+                                                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">ID</th>
+                                                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Técnico</th>
+                                                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Saída</th>
+                                                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Entrada</th>
+                                                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Data</th>
+                                                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Prazo</th>
+                                                <th className="text-left px-4 py-3 text-[10px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
                                             </tr>
                                         </thead>
                                         <tbody>
                                             {minhasSolicitacoes.map((sol) => (
                                                 <tr key={sol.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
-                                                    <td className="px-4 py-3 font-mono text-xs font-semibold text-slate-900">{sol.id}</td>
-                                                    <td className="px-4 py-3">
-                                                        <p className="text-slate-900 font-medium">{sol.tecnicoNome}</p>
-                                                        <p className="text-xs text-slate-500">{sol.tecnicoMatricula}</p>
+                                                    <td className="px-4 py-4 font-mono text-xs font-bold text-slate-900">{sol.id}</td>
+                                                    <td className="px-4 py-4">
+                                                        <p className="text-slate-900 font-bold">{sol.tecnicoNome}</p>
+                                                        <p className="text-[11px] text-slate-500 font-medium">{sol.tecnicoMatricula}</p>
                                                     </td>
-                                                    <td className="px-4 py-3 text-slate-700">{sol.itemSaidaNome}</td>
-                                                    <td className="px-4 py-3 text-slate-700">{sol.materialEntradaNome}</td>
-                                                    <td className="px-4 py-3 text-slate-500">{new Date(sol.dataSolicitacao).toLocaleDateString('pt-BR')}</td>
-                                                    <td className="px-4 py-3 text-slate-500">{new Date(sol.prazoResolucao).toLocaleDateString('pt-BR')}</td>
-                                                    <td className="px-4 py-3">
+                                                    <td className="px-4 py-4 text-slate-700 font-medium">{sol.itemSaidaNome}</td>
+                                                    <td className="px-4 py-4 text-slate-700 font-medium">{sol.materialEntradaNome}</td>
+                                                    <td className="px-4 py-4 text-slate-500 font-medium">{new Date(sol.dataSolicitacao).toLocaleDateString('pt-BR')}</td>
+                                                    <td className="px-4 py-4 text-slate-500 font-medium">{new Date(sol.prazoResolucao).toLocaleDateString('pt-BR')}</td>
+                                                    <td className="px-4 py-4">
                                                         <StatusBadge status={sol.status} />
                                                     </td>
                                                 </tr>
                                             ))}
                                         </tbody>
                                     </table>
+                                </div>
+
+                                {/* Mobile/Tablet View */}
+                                <div className="lg:hidden divide-y divide-slate-100">
+                                    {minhasSolicitacoes.map((sol) => (
+                                        <div key={sol.id} className="p-4 space-y-3 bg-white">
+                                            <div className="flex items-start justify-between">
+                                                <div>
+                                                    <span className="font-mono text-[10px] font-bold text-slate-400 uppercase tracking-widest">#{sol.id}</span>
+                                                    <h3 className="text-sm font-bold text-slate-900 mt-0.5">{sol.tecnicoNome}</h3>
+                                                </div>
+                                                <StatusBadge status={sol.status} />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4 py-2 border-y border-slate-50">
+                                                <div>
+                                                    <p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider mb-1">Devolve (Saída)</p>
+                                                    <p className="text-xs font-medium text-slate-800 leading-tight">{sol.itemSaidaNome}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="text-[9px] uppercase font-bold text-slate-400 tracking-wider mb-1">Recebe (Entrada)</p>
+                                                    <p className="text-xs font-medium text-slate-800 leading-tight">{sol.materialEntradaNome}</p>
+                                                </div>
+                                            </div>
+                                            <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
+                                                <span>Data: {new Date(sol.dataSolicitacao).toLocaleDateString('pt-BR')}</span>
+                                                <span>Prazo: {new Date(sol.prazoResolucao).toLocaleDateString('pt-BR')}</span>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}

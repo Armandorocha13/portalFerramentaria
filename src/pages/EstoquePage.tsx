@@ -106,24 +106,26 @@ export default function EstoquePage() {
     return (
         <div className="min-h-screen bg-slate-50">
             {/* Header */}
-            <header className="bg-white border-b border-slate-200">
-                <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <img src="/logo.png" alt="FFA Infraestrutura" className="h-10" />
+            <header className="bg-white border-b border-slate-200 sticky top-0 z-50">
+                <div className="max-w-6xl mx-auto px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <img src="/logo.png" alt="FFA Infraestrutura" className="h-8 sm:h-10" />
                         <div>
-                            <h1 className="text-sm font-semibold text-slate-900">Painel da Ferramentaria</h1>
-                            <p className="text-xs text-slate-500">{usuario?.nome} · {usuario?.setor}</p>
+                            <h1 className="text-xs sm:text-sm font-bold text-slate-900 leading-tight">Painel Ferramentaria</h1>
+                            <p className="text-[10px] sm:text-xs text-slate-500 truncate max-w-[120px] sm:max-w-none">
+                                {usuario?.nome.split(' ')[0]} · {usuario?.setor}
+                            </p>
                         </div>
                     </div>
-                    <div className="flex items-center gap-3">
-                        <span className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-100 rounded-full px-3 py-1">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        <span className="hidden md:inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 bg-slate-100 rounded-full px-3 py-1">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                             Estoque Online
                         </span>
                         <button
                             id="btn-logout"
                             onClick={logout}
-                            className="text-xs text-slate-500 hover:text-slate-900 border border-slate-200 rounded px-3 py-1.5 hover:border-slate-400 transition-colors"
+                            className="text-[11px] sm:text-xs text-slate-600 hover:text-slate-900 border border-slate-200 rounded px-2.5 py-1.5 hover:border-slate-400 transition-colors bg-white font-medium"
                         >
                             Sair
                         </button>
@@ -172,11 +174,11 @@ export default function EstoquePage() {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-0 border-b border-slate-200 mb-6">
+                <div className="flex overflow-x-auto no-scrollbar gap-0 border-b border-slate-200 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
                     <button
                         id="tab-fila"
                         onClick={() => setTabAtiva('fila')}
-                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${tabAtiva === 'fila'
+                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${tabAtiva === 'fila'
                             ? 'border-black text-slate-900'
                             : 'border-transparent text-slate-500 hover:text-slate-700'
                             }`}
@@ -191,7 +193,7 @@ export default function EstoquePage() {
                     <button
                         id="tab-concluidos"
                         onClick={() => setTabAtiva('concluidos')}
-                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px ${tabAtiva === 'concluidos'
+                        className={`px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap ${tabAtiva === 'concluidos'
                             ? 'border-black text-slate-900'
                             : 'border-transparent text-slate-500 hover:text-slate-700'
                             }`}
@@ -218,7 +220,8 @@ export default function EstoquePage() {
                             </div>
                         ) : (
                             <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                                <div className="overflow-x-auto">
+                                {/* Desktop Table View */}
+                                <div className="hidden lg:block overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="border-b border-slate-200 bg-slate-50">
@@ -294,6 +297,71 @@ export default function EstoquePage() {
                                         </tbody>
                                     </table>
                                 </div>
+
+                                {/* Mobile/Tablet Card View */}
+                                <div className="lg:hidden divide-y divide-slate-100">
+                                    {pendentes.map((sol) => {
+                                        const horasRestantes = calcularHorasRestantes(sol.prazoResolucao);
+                                        const urgencia = classificarUrgencia(horasRestantes);
+
+                                        return (
+                                            <div key={sol.id} className="p-4 bg-white space-y-4">
+                                                <div className="flex items-start justify-between">
+                                                    <div>
+                                                        <span className="font-mono text-[10px] font-bold text-slate-400 uppercase tracking-widest">#{sol.id}</span>
+                                                        <h3 className="text-sm font-bold text-slate-900 mt-0.5">{sol.tecnicoNome}</h3>
+                                                        <p className="text-[11px] text-slate-500">{sol.tecnicoMatricula}</p>
+                                                    </div>
+                                                    <PrazoBadge horasRestantes={horasRestantes} urgencia={urgencia} prazo={sol.prazoResolucao} />
+                                                </div>
+
+                                                <div className="grid grid-cols-2 gap-4 py-3 border-y border-slate-50">
+                                                    <div>
+                                                        <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Saída</p>
+                                                        <p className="text-xs font-medium text-slate-800 leading-tight">{sol.itemSaidaNome}</p>
+                                                        {sol.itemSaidaPatrimonio && (
+                                                            <p className="text-[10px] text-slate-500 mt-1 font-mono">PAT: {sol.itemSaidaPatrimonio}</p>
+                                                        )}
+                                                    </div>
+                                                    <div>
+                                                        <p className="text-[10px] uppercase font-bold text-slate-400 tracking-wider mb-1">Entrada</p>
+                                                        <p className="text-xs font-medium text-slate-800 leading-tight">{sol.materialEntradaNome}</p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center justify-between pt-1">
+                                                    <p className="text-[10px] text-slate-400">
+                                                        Solicitado em: {new Date(sol.dataSolicitacao).toLocaleDateString('pt-BR')}
+                                                    </p>
+                                                    {confirmando === sol.id ? (
+                                                        <div className="flex items-center gap-2">
+                                                            <button
+                                                                onClick={() => setConfirmando(null)}
+                                                                className="text-xs px-3 py-1.5 border border-slate-200 rounded text-slate-600 font-medium"
+                                                            >
+                                                                Não
+                                                            </button>
+                                                            <button
+                                                                onClick={() => handleFinalizar(sol.id)}
+                                                                className="text-xs px-4 py-1.5 bg-black text-white rounded font-bold"
+                                                            >
+                                                                Sim, Finalizar
+                                                            </button>
+                                                        </div>
+                                                    ) : (
+                                                        <button
+                                                            onClick={() => setConfirmando(sol.id)}
+                                                            className="flex items-center gap-2 bg-black text-white px-4 py-2 rounded-lg text-xs font-bold active:scale-95 transition-transform"
+                                                        >
+                                                            <IconCheck />
+                                                            Finalizar Pedido
+                                                        </button>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         )}
                     </div>
@@ -312,7 +380,8 @@ export default function EstoquePage() {
                             </div>
                         ) : (
                             <div className="bg-white border border-slate-200 rounded-lg overflow-hidden">
-                                <div className="overflow-x-auto">
+                                {/* Desktop Table View */}
+                                <div className="hidden lg:block overflow-x-auto">
                                     <table className="w-full text-sm">
                                         <thead>
                                             <tr className="border-b border-slate-200 bg-slate-50">
@@ -345,6 +414,37 @@ export default function EstoquePage() {
                                             ))}
                                         </tbody>
                                     </table>
+                                </div>
+
+                                {/* Mobile/Tablet Card View */}
+                                <div className="lg:hidden divide-y divide-slate-100">
+                                    {concluidas.map((sol) => (
+                                        <div key={sol.id} className="p-4 bg-white space-y-3">
+                                            <div className="flex items-start justify-between">
+                                                <div>
+                                                    <span className="font-mono text-[10px] font-bold text-slate-400 uppercase tracking-widest">#{sol.id}</span>
+                                                    <h3 className="text-sm font-bold text-slate-900 mt-0.5">{sol.tecnicoNome}</h3>
+                                                </div>
+                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold px-2 py-1 rounded bg-emerald-50 text-emerald-700 border border-emerald-100">
+                                                    <IconCheck />
+                                                    CONCLUÍDO
+                                                </span>
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4 text-[11px] text-slate-600">
+                                                <div>
+                                                    <span className="block text-[9px] uppercase font-bold text-slate-400 mb-0.5">Saída</span>
+                                                    {sol.itemSaidaNome}
+                                                </div>
+                                                <div>
+                                                    <span className="block text-[9px] uppercase font-bold text-slate-400 mb-0.5">Entrada</span>
+                                                    {sol.materialEntradaNome}
+                                                </div>
+                                            </div>
+                                            <p className="text-[10px] text-slate-400">
+                                                Solicitado em: {new Date(sol.dataSolicitacao).toLocaleDateString('pt-BR')}
+                                            </p>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}
