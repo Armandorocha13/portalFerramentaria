@@ -2,8 +2,20 @@
 // TIPOS DO SISTEMA DE GESTÃO DE TROCAS
 // ============================================================
 
+/** Perfis de acesso do sistema */
+export type UserPerfil = 'supervisor' | 'estoque';
+
 /** Status do técnico no sistema */
 export type TecnicoStatus = 'ativo' | 'inativo' | 'ferias' | 'afastado';
+
+/** Usuário unificado do sistema (login por matrícula) */
+export interface Usuario {
+    matricula: string;
+    nome: string;
+    senha: string;
+    setor: string;
+    perfil: UserPerfil;
+}
 
 /** Técnico registrado no sistema */
 export interface Tecnico {
@@ -56,7 +68,7 @@ export interface SolicitacaoTroca {
     status: SolicitacaoStatus;
 }
 
-/** Credenciais de login do supervisor */
+/** Credenciais de login do supervisor (mantido para compatibilidade) */
 export interface Supervisor {
     matricula: string;
     nome: string;

@@ -6,7 +6,7 @@ import { useState, useMemo, type FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSolicitacoes } from '../context/SolicitacoesContext';
 import { buscarTecnico, buscarCargaTecnico, listarMateriais, calcularPrazoD1 } from '../mocks/database';
-import type { Tecnico, ItemCarga, Material, FormularioTroca } from '../types';
+import type { ItemCarga, Material, FormularioTroca } from '../types';
 
 // ---- Ícones SVG inline ----
 function IconCheck() {
@@ -51,7 +51,7 @@ const INITIAL_FORM: FormularioTroca = {
 };
 
 export default function SupervisorPage() {
-    const { supervisor, logout } = useAuth();
+    const { usuario, logout } = useAuth();
     const { adicionarSolicitacao, buscarPorSupervisor, proximoSequencial } = useSolicitacoes();
 
     const [step, setStep] = useState(0);
@@ -62,8 +62,8 @@ export default function SupervisorPage() {
     const [filtroCategoria, setFiltroCategoria] = useState('');
 
     const minhasSolicitacoes = useMemo(
-        () => buscarPorSupervisor(supervisor?.matricula || ''),
-        [buscarPorSupervisor, supervisor]
+        () => buscarPorSupervisor(usuario?.matricula || ''),
+        [buscarPorSupervisor, usuario]
     );
 
     // ---- Lógica de cada Step ----
@@ -115,13 +115,13 @@ export default function SupervisorPage() {
 
     // Step 5: Confirmar e registrar
     function handleConfirmar() {
-        if (!supervisor || !form.tecnicoValidado || !form.itemSaidaSelecionado || !form.materialEntradaSelecionado) return;
+        if (!usuario || !form.tecnicoValidado || !form.itemSaidaSelecionado || !form.materialEntradaSelecionado) return;
 
         const agora = new Date().toISOString().split('T')[0];
         const prazo = calcularPrazoD1(agora);
 
         const nova = adicionarSolicitacao({
-            supervisorMatricula: supervisor.matricula,
+            supervisorMatricula: usuario.matricula,
             tecnicoMatricula: form.tecnicoValidado.matricula,
             tecnicoNome: form.tecnicoValidado.nome,
             itemSaidaId: form.itemSaidaSelecionado.id,
@@ -187,7 +187,7 @@ export default function SupervisorPage() {
                         <img src="/logo.png" alt="FFA Infraestrutura" className="h-10" />
                         <div>
                             <h1 className="text-sm font-semibold text-slate-900">Gestão de Trocas</h1>
-                            <p className="text-xs text-slate-500">{supervisor?.nome} · {supervisor?.setor}</p>
+                            <p className="text-xs text-slate-500">{usuario?.nome} · {usuario?.setor}</p>
                         </div>
                     </div>
                     <button

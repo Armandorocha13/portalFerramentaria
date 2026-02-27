@@ -1,13 +1,14 @@
 // ============================================================
-// CONTEXT — Autenticação do Supervisor
+// CONTEXT — Autenticação Unificada (Role-Based Access)
 // ============================================================
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import type { Supervisor } from '../types';
-import { autenticarSupervisor } from '../mocks/database';
+import type { Usuario, UserPerfil } from '../types';
+import { autenticarUsuario } from '../mocks/database';
 
 interface AuthContextData {
-    supervisor: Supervisor | null;
+    usuario: Usuario | null;
+    perfil: UserPerfil | null;
     isAuthenticated: boolean;
     login: (matricula: string, senha: string) => { success: boolean; error?: string };
     logout: () => void;
@@ -16,31 +17,32 @@ interface AuthContextData {
 const AuthContext = createContext<AuthContextData | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
-    const [supervisor, setSupervisor] = useState<Supervisor | null>(null);
+    const [usuario, setUsuario] = useState<Usuario | null>(null);
 
     const login = useCallback((matricula: string, senha: string) => {
         if (!matricula.trim() || !senha.trim()) {
             return { success: false, error: 'Preencha matrícula e senha.' };
         }
 
-        const sup = autenticarSupervisor(matricula, senha);
-        if (!sup) {
+        const user = autenticarUsuario(matricula, senha);
+        if (!user) {
             return { success: false, error: 'Matrícula ou senha inválidos.' };
         }
 
-        setSupervisor(sup);
+        setUsuario(user);
         return { success: true };
     }, []);
 
     const logout = useCallback(() => {
-        setSupervisor(null);
+        setUsuario(null);
     }, []);
 
     return (
         <AuthContext.Provider
             value={{
-                supervisor,
-                isAuthenticated: !!supervisor,
+                usuario,
+                perfil: usuario?.perfil ?? null,
+                isAuthenticated: !!usuario,
                 login,
                 logout,
             }}

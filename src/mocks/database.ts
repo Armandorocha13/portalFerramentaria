@@ -2,29 +2,53 @@
 // MOCK DATABASE — Sistema de Gestão de Trocas
 // ============================================================
 
-import type { Supervisor, Tecnico, ItemCarga, Material } from '../types';
+import type { Usuario, Supervisor, Tecnico, ItemCarga, Material } from '../types';
 
-// ---- SUPERVISORES (autenticação simulada) ----
-export const supervisores: Supervisor[] = [
+// ---- USUÁRIOS DO SISTEMA (login unificado por matrícula) ----
+export const usuarios: Usuario[] = [
+    // ── Supervisores ──
     {
         matricula: 'SUP001',
         nome: 'Carlos Eduardo Mendes',
         senha: '123456',
         setor: 'Linha de Produção A',
+        perfil: 'supervisor',
     },
     {
         matricula: 'SUP002',
         nome: 'Ana Paula Ferreira',
         senha: '123456',
         setor: 'Linha de Produção B',
+        perfil: 'supervisor',
     },
     {
         matricula: 'SUP003',
         nome: 'Roberto Silva Neto',
         senha: '123456',
         setor: 'Linha de Produção C',
+        perfil: 'supervisor',
+    },
+    // ── Estoque / Ferramentaria ──
+    {
+        matricula: 'EST001',
+        nome: 'Marcos Vinícius Lopes',
+        senha: '123456',
+        setor: 'Ferramentaria Central',
+        perfil: 'estoque',
+    },
+    {
+        matricula: 'EST002',
+        nome: 'Juliana Ramos Cardoso',
+        senha: '123456',
+        setor: 'Ferramentaria Central',
+        perfil: 'estoque',
     },
 ];
+
+// Manter array de supervisores derivado para compatibilidade
+export const supervisores: Supervisor[] = usuarios
+    .filter((u) => u.perfil === 'supervisor')
+    .map(({ matricula, nome, senha, setor }) => ({ matricula, nome, senha, setor }));
 
 // ---- TÉCNICOS ----
 export const tecnicos: Tecnico[] = [
@@ -311,7 +335,14 @@ export const itensCarga: ItemCarga[] = [
 
 // ---- FUNÇÕES AUXILIARES DO MOCK ----
 
-/** Autentica um supervisor pelo matrícula e senha */
+/** Autentica um usuário pelo matrícula e senha (unificado) */
+export function autenticarUsuario(matricula: string, senha: string): Usuario | null {
+    return usuarios.find(
+        (u) => u.matricula.toUpperCase() === matricula.toUpperCase() && u.senha === senha
+    ) ?? null;
+}
+
+/** Autentica um supervisor pelo matrícula e senha (compatibilidade) */
 export function autenticarSupervisor(matricula: string, senha: string): Supervisor | null {
     return supervisores.find(
         (s) => s.matricula.toUpperCase() === matricula.toUpperCase() && s.senha === senha
