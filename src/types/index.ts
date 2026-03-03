@@ -10,6 +10,7 @@ export type TecnicoStatus = 'ativo' | 'inativo' | 'ferias' | 'afastado';
 
 /** Usuário unificado do sistema (login por matrícula) */
 export interface Usuario {
+    id: string; // Adicionado id vindo do Supabase
     matricula: string;
     nome: string;
     senha: string;

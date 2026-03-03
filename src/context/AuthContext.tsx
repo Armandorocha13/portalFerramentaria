@@ -4,13 +4,13 @@
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
 import type { Usuario, UserPerfil } from '../types';
-import { autenticarUsuario } from '../mocks/database';
+import { supabase } from '../lib/supabase';
 
 interface AuthContextData {
     usuario: Usuario | null;
     perfil: UserPerfil | null;
     isAuthenticated: boolean;
-    login: (matricula: string, senha: string) => { success: boolean; error?: string };
+    login: (matricula: string, senha: string) => Promise<{ success: boolean; error?: string }>;
     logout: () => void;
 }
 
@@ -19,18 +19,37 @@ const AuthContext = createContext<AuthContextData | undefined>(undefined);
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [usuario, setUsuario] = useState<Usuario | null>(null);
 
-    const login = useCallback((matricula: string, senha: string) => {
+    const login = useCallback(async (matricula: string, senha: string) => {
         if (!matricula.trim() || !senha.trim()) {
             return { success: false, error: 'Preencha matrícula e senha.' };
         }
 
-        const user = autenticarUsuario(matricula, senha);
-        if (!user) {
-            return { success: false, error: 'Matrícula ou senha inválidos.' };
-        }
+        try {
+            const { data, error } = await supabase
+                .from('supervisores')
+                .select('*')
+                .eq('matricula', matricula.trim().toUpperCase())
+                .eq('senha', senha) // No mundo real, usaríamos hash e Auth do Supabase
+                .single();
 
-        setUsuario(user);
-        return { success: true };
+            if (error || !data) {
+                return { success: false, error: 'Matrícula ou senha inválidos, ou você não é supervisor.' };
+            }
+
+            const user: Usuario = {
+                id: data.id, // Store Supabase UUID
+                matricula: data.matricula,
+                nome: data.nome,
+                senha: '', // Não expor senha no estado
+                setor: data.setor || 'Geral',
+                perfil: 'supervisor',
+            };
+
+            setUsuario(user);
+            return { success: true };
+        } catch (err) {
+            return { success: false, error: 'Erro de conexão com o banco de dados.' };
+        }
     }, []);
 
     const logout = useCallback(() => {

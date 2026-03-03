@@ -12,19 +12,21 @@ export default function LoginPage() {
     const [erro, setErro] = useState('');
     const [loading, setLoading] = useState(false);
 
-    function handleSubmit(e: FormEvent) {
+    async function handleSubmit(e: FormEvent) {
         e.preventDefault();
         setErro('');
         setLoading(true);
 
-        // Simula delay de rede
-        setTimeout(() => {
-            const result = login(matricula.trim(), senha);
+        try {
+            const result = await login(matricula.trim(), senha);
             if (!result.success) {
                 setErro(result.error || 'Erro desconhecido.');
             }
+        } catch (err) {
+            setErro('Erro ao tentar autenticar.');
+        } finally {
             setLoading(false);
-        }, 600);
+        }
     }
 
     return (

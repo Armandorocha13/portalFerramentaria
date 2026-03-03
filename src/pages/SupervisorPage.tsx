@@ -2,10 +2,11 @@
 // PÁGINA DO SUPERVISOR — Formulário de Troca em 6 Etapas
 // ============================================================
 
-import { useState, useMemo, type FormEvent } from 'react';
+import { useState, useMemo, useEffect, useCallback, type FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSolicitacoes } from '../context/SolicitacoesContext';
-import { buscarTecnico, buscarCargaTecnico, listarMateriais, calcularPrazoD1 } from '../mocks/database';
+import { getTecnico, getCargaTecnico, getCatalogoMateriais, registrarTroca, getHistoricoTrocas } from '../lib/database-queries';
+import { calcularPrazoD1 } from '../mocks/database';
 import type { ItemCarga, Material, FormularioTroca } from '../types';
 
 // ---- Ícones SVG inline ----
@@ -57,9 +58,30 @@ export default function SupervisorPage() {
     const [step, setStep] = useState(0);
     const [form, setForm] = useState<FormularioTroca>({ ...INITIAL_FORM });
     const [erro, setErro] = useState('');
+    const [loading, setLoading] = useState(false);
     const [sucesso, setSucesso] = useState('');
     const [tabAtiva, setTabAtiva] = useState<'nova' | 'historico'>('nova');
     const [filtroCategoria, setFiltroCategoria] = useState('');
+
+    // Estados para carregar dados do Supabase
+    const [cargaTecnico, setCargaTecnico] = useState<ItemCarga[]>([]);
+    const [catalogoMateriais, setCatalogoMateriais] = useState<Material[]>([]);
+    const [historicoSupabase, setHistoricoSupabase] = useState<any[]>([]);
+
+    const fetchHistorico = useCallback(async () => {
+        if (!usuario?.id) return;
+        setLoading(true);
+        try {
+            const data = await getHistoricoTrocas(usuario.id);
+            setHistoricoSupabase(data);
+        } finally {
+            setLoading(false);
+        }
+    }, [usuario]);
+
+    useEffect(() => {
+        if (tabAtiva === 'historico') fetchHistorico();
+    }, [tabAtiva, fetchHistorico]);
 
     const minhasSolicitacoes = useMemo(
         () => buscarPorSupervisor(usuario?.matricula || ''),
@@ -69,25 +91,39 @@ export default function SupervisorPage() {
     // ---- Lógica de cada Step ----
 
     // Step 0: Inserir matrícula do técnico
-    function handleBuscarTecnico(e: FormEvent) {
+    async function handleBuscarTecnico(e: FormEvent) {
         e.preventDefault();
         setErro('');
-        const tecnico = buscarTecnico(form.tecnicoMatricula);
-        if (!tecnico) {
-            setErro('Técnico não encontrado. Verifique a matrícula.');
-            return;
+        setLoading(true);
+
+        try {
+            if (!usuario?.id) throw new Error('Cessão inválida. Logue novamente.');
+
+            const tecnico = await getTecnico(form.tecnicoMatricula, usuario.id);
+            if (!tecnico) {
+                setErro('Técnico não encontrado na sua equipe. Verifique a matrícula ou o vínculo.');
+                return;
+            }
+            if (tecnico.status !== 'ativo') {
+                setErro(`Técnico ${tecnico.nome} está com status: ${tecnico.status}. Apenas técnicos ativos realizam trocas.`);
+                return;
+            }
+
+            // Carregar carga e catálogo assim que validar
+            const [carga, materiais] = await Promise.all([
+                getCargaTecnico(tecnico.matricula),
+                getCatalogoMateriais()
+            ]);
+
+            setCargaTecnico(carga);
+            setCatalogoMateriais(materiais);
+            setForm((prev) => ({ ...prev, tecnicoValidado: tecnico }));
+            setStep(1);
+        } catch (err: any) {
+            setErro(err.message || 'Erro ao consultar técnico.');
+        } finally {
+            setLoading(false);
         }
-        if (tecnico.status !== 'ativo') {
-            const statusMap: Record<string, string> = {
-                inativo: 'inativo no sistema',
-                ferias: 'em período de férias',
-                afastado: 'afastado',
-            };
-            setErro(`Técnico ${tecnico.nome} está ${statusMap[tecnico.status] || tecnico.status}. Apenas técnicos ativos podem realizar trocas.`);
-            return;
-        }
-        setForm((prev) => ({ ...prev, tecnicoValidado: tecnico }));
-        setStep(1);
     }
 
     // Step 2: Selecionar item de saída
@@ -114,34 +150,50 @@ export default function SupervisorPage() {
     }
 
     // Step 5: Confirmar e registrar
-    function handleConfirmar() {
+    async function handleConfirmar() {
         if (!usuario || !form.tecnicoValidado || !form.itemSaidaSelecionado || !form.materialEntradaSelecionado) return;
+        setLoading(true);
 
-        const agora = new Date().toISOString().split('T')[0];
-        const prazo = calcularPrazoD1(agora);
+        try {
+            // 1. Registro Real no Supabase
+            await registrarTroca({
+                supervisor_id: usuario.id,
+                tecnico_matricula: form.tecnicoValidado.matricula,
+                item_saida_id: form.itemSaidaSelecionado.id,
+                material_entrada_id: form.materialEntradaSelecionado.nome, // Usando nome como exemplo
+                motivo: form.motivo.trim(),
+            });
 
-        const nova = adicionarSolicitacao({
-            supervisorMatricula: usuario.matricula,
-            tecnicoMatricula: form.tecnicoValidado.matricula,
-            tecnicoNome: form.tecnicoValidado.nome,
-            itemSaidaId: form.itemSaidaSelecionado.id,
-            itemSaidaNome: form.itemSaidaSelecionado.materialNome,
-            itemSaidaPatrimonio: form.itemSaidaSelecionado.patrimonio,
-            materialEntradaId: form.materialEntradaSelecionado.id,
-            materialEntradaNome: form.materialEntradaSelecionado.nome,
-            motivo: form.motivo.trim(),
-            dataSolicitacao: agora,
-            prazoResolucao: prazo,
-            status: 'pendente',
-        });
+            // 2. Mock de adição local para histórico imediato (opcional)
+            const agora = new Date().toISOString().split('T')[0];
+            const prazo = calcularPrazoD1(agora);
 
-        setSucesso(`Solicitação ${nova.id} registrada com sucesso!`);
-        setForm({ ...INITIAL_FORM });
-        setStep(0);
-        setErro('');
+            const nova = adicionarSolicitacao({
+                supervisorMatricula: usuario.matricula,
+                tecnicoMatricula: form.tecnicoValidado.matricula,
+                tecnicoNome: form.tecnicoValidado.nome,
+                itemSaidaId: form.itemSaidaSelecionado.id,
+                itemSaidaNome: form.itemSaidaSelecionado.materialNome,
+                itemSaidaPatrimonio: form.itemSaidaSelecionado.patrimonio,
+                materialEntradaId: form.materialEntradaSelecionado.id,
+                materialEntradaNome: form.materialEntradaSelecionado.nome,
+                motivo: form.motivo.trim(),
+                dataSolicitacao: agora,
+                prazoResolucao: prazo,
+                status: 'pendente',
+            });
 
-        // Limpa sucesso após alguns segundos
-        setTimeout(() => setSucesso(''), 5000);
+            setSucesso(`Solicitação ${nova.id} registrada com sucesso no Supabase!`);
+            setForm({ ...INITIAL_FORM });
+            setStep(0);
+            setErro('');
+
+            setTimeout(() => setSucesso(''), 5000);
+        } catch (err: any) {
+            setErro(`Erro ao registrar: ${err.message}`);
+        } finally {
+            setLoading(false);
+        }
     }
 
     // Resetar formulário
@@ -167,11 +219,9 @@ export default function SupervisorPage() {
     }
 
     // ---- Listagens ----
-    const cargaTecnico = form.tecnicoValidado
-        ? buscarCargaTecnico(form.tecnicoValidado.matricula)
-        : [];
+    // cargaTecnico já está vindo do state
 
-    const todosMateriaisEntrada = listarMateriais();
+    const todosMateriaisEntrada = catalogoMateriais;
     const categoriasUnicas = [...new Set(todosMateriaisEntrada.map((m) => m.categoria))];
     const materiaisFiltrados = filtroCategoria
         ? todosMateriaisEntrada.filter((m) => m.categoria === filtroCategoria)
@@ -233,9 +283,9 @@ export default function SupervisorPage() {
                             }`}
                     >
                         Acompanhamento
-                        {minhasSolicitacoes.length > 0 && (
+                        {historicoSupabase.length > 0 && (
                             <span className="ml-2 bg-black text-white text-xs rounded-full px-2 py-0.5">
-                                {minhasSolicitacoes.length}
+                                {historicoSupabase.length}
                             </span>
                         )}
                     </button>
@@ -311,9 +361,10 @@ export default function SupervisorPage() {
                                     <button
                                         id="btn-buscar-tecnico"
                                         type="submit"
-                                        className="w-full sm:w-auto bg-black text-white text-sm font-bold px-8 py-3 rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 active:scale-95"
+                                        disabled={loading}
+                                        className="w-full sm:w-auto bg-black text-white text-sm font-bold px-8 py-3 rounded-xl hover:bg-slate-800 transition-all flex items-center justify-center gap-2 active:scale-95 disabled:opacity-50"
                                     >
-                                        Validar Técnico
+                                        {loading ? 'Consultando...' : 'Validar Técnico'}
                                         <IconArrowRight />
                                     </button>
                                 </form>
@@ -607,10 +658,15 @@ export default function SupervisorPage() {
                                         id="btn-confirmar-troca"
                                         onClick={handleConfirmar}
                                         type="button"
-                                        className="bg-black text-white text-sm font-medium px-6 py-2 rounded-md hover:bg-slate-800 transition-colors flex items-center gap-1.5"
+                                        disabled={loading}
+                                        className="bg-black text-white text-sm font-medium px-6 py-2 rounded-md hover:bg-slate-800 transition-colors flex items-center gap-1.5 disabled:opacity-50"
                                     >
-                                        <IconCheck />
-                                        Registrar Solicitação
+                                        {loading ? 'Registrando...' : (
+                                            <>
+                                                <IconCheck />
+                                                Registrar Solicitação
+                                            </>
+                                        )}
                                     </button>
                                 </div>
                             </div>
@@ -650,9 +706,9 @@ export default function SupervisorPage() {
                                             </tr>
                                         </thead>
                                         <tbody>
-                                            {minhasSolicitacoes.map((sol) => (
+                                            {historicoSupabase.map((sol) => (
                                                 <tr key={sol.id} className="border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors">
-                                                    <td className="px-4 py-4 font-mono text-xs font-bold text-slate-900">{sol.id}</td>
+                                                    <td className="px-4 py-4 font-mono text-xs font-bold text-slate-900">{sol.id.split('-')[0]}</td>
                                                     <td className="px-4 py-4">
                                                         <p className="text-slate-900 font-bold">{sol.tecnicoNome}</p>
                                                         <p className="text-[11px] text-slate-500 font-medium">{sol.tecnicoMatricula}</p>
@@ -672,11 +728,11 @@ export default function SupervisorPage() {
 
                                 {/* Mobile/Tablet View */}
                                 <div className="lg:hidden divide-y divide-slate-100">
-                                    {minhasSolicitacoes.map((sol) => (
+                                    {historicoSupabase.map((sol) => (
                                         <div key={sol.id} className="p-4 space-y-3 bg-white">
                                             <div className="flex items-start justify-between">
                                                 <div>
-                                                    <span className="font-mono text-[10px] font-bold text-slate-400 uppercase tracking-widest">#{sol.id}</span>
+                                                    <span className="font-mono text-[10px] font-bold text-slate-400 uppercase tracking-widest">#{sol.id.split('-')[0]}</span>
                                                     <h3 className="text-sm font-bold text-slate-900 mt-0.5">{sol.tecnicoNome}</h3>
                                                 </div>
                                                 <StatusBadge status={sol.status} />
@@ -693,7 +749,6 @@ export default function SupervisorPage() {
                                             </div>
                                             <div className="flex items-center justify-between text-[10px] text-slate-400 font-medium">
                                                 <span>Data: {new Date(sol.dataSolicitacao).toLocaleDateString('pt-BR')}</span>
-                                                <span>Prazo: {new Date(sol.prazoResolucao).toLocaleDateString('pt-BR')}</span>
                                             </div>
                                         </div>
                                     ))}
