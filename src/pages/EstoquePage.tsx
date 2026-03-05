@@ -3,7 +3,7 @@
 // Dados em tempo real via Supabase
 // ============================================================
 
-import { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 
@@ -129,6 +129,47 @@ export default function EstoquePage() {
     const liberados = trocas.filter((t) => t.status === 'liberado_retirada');
     const semEstoque = trocas.filter((t) => t.status === 'sem_estoque');
 
+    // ---- Troca de senha ----
+    const [showSenha, setShowSenha] = useState(false);
+    const [senhaAtual, setSenhaAtual] = useState('');
+    const [senhaNova, setSenhaNova] = useState('');
+    const [senhaConfirm, setSenhaConfirm] = useState('');
+    const [senhaErro, setSenhaErro] = useState('');
+    const [senhaSucesso, setSenhaSucesso] = useState('');
+    const [salvandoSenha, setSalvandoSenha] = useState(false);
+
+    async function handleAlterarSenha(e: React.FormEvent) {
+        e.preventDefault();
+        setSenhaErro('');
+        setSenhaSucesso('');
+        if (senhaNova.length < 4) { setSenhaErro('A nova senha deve ter ao menos 4 caracteres.'); return; }
+        if (senhaNova !== senhaConfirm) { setSenhaErro('As senhas não coincidem.'); return; }
+        setSalvandoSenha(true);
+        try {
+            // Valida senha atual
+            const { data: userData } = await supabase
+                .from('usuarios_estoque')
+                .select('id')
+                .eq('id', usuario?.id)
+                .eq('senha', senhaAtual)
+                .single();
+            if (!userData) { setSenhaErro('Senha atual incorreta.'); return; }
+            // Atualiza senha
+            const { error } = await supabase
+                .from('usuarios_estoque')
+                .update({ senha: senhaNova })
+                .eq('id', usuario?.id);
+            if (error) throw error;
+            setSenhaSucesso('Senha alterada com sucesso!');
+            setSenhaAtual(''); setSenhaNova(''); setSenhaConfirm('');
+            setTimeout(() => { setSenhaSucesso(''); setShowSenha(false); }, 2000);
+        } catch {
+            setSenhaErro('Erro ao alterar senha. Tente novamente.');
+        } finally {
+            setSalvandoSenha(false);
+        }
+    }
+
     return (
         <div className="min-h-screen bg-slate-50">
             {/* Header */}
@@ -152,6 +193,16 @@ export default function EstoquePage() {
                         >
                             <span className={loading ? 'animate-spin inline-block' : ''}><IconRefresh /></span>
                         </button>
+                        {/* Botão Alterar Senha */}
+                        <button
+                            onClick={() => setShowSenha(true)}
+                            title="Alterar senha"
+                            className="p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-800 hover:bg-slate-50 transition-all"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                            </svg>
+                        </button>
                         <span className="hidden md:inline-flex items-center gap-1.5 text-xs font-bold text-slate-500 bg-slate-100 rounded-full px-3 py-1 uppercase tracking-wider">
                             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
                             Estoque Online
@@ -166,6 +217,41 @@ export default function EstoquePage() {
                     </div>
                 </div>
             </header>
+
+            {/* Modal Alterar Senha */}
+            {showSenha && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center px-4" style={{ background: 'rgba(0,0,0,0.4)', backdropFilter: 'blur(4px)' }}>
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+                        <div className="flex items-center justify-between mb-5">
+                            <h2 className="text-sm font-black text-slate-900 uppercase tracking-tight">Alterar Senha</h2>
+                            <button onClick={() => { setShowSenha(false); setSenhaErro(''); setSenhaSucesso(''); }} className="text-slate-400 hover:text-slate-700 text-xl leading-none">&times;</button>
+                        </div>
+                        <form onSubmit={handleAlterarSenha} className="space-y-4">
+                            <div className="space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Senha Atual</label>
+                                <input type="password" value={senhaAtual} onChange={e => setSenhaAtual(e.target.value)} required
+                                    className="w-full px-4 py-3 border-2 border-slate-100 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-black transition-all" />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Nova Senha</label>
+                                <input type="password" value={senhaNova} onChange={e => setSenhaNova(e.target.value)} required
+                                    className="w-full px-4 py-3 border-2 border-slate-100 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-black transition-all" />
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="block text-[10px] font-black text-slate-400 uppercase tracking-widest">Confirmar Nova Senha</label>
+                                <input type="password" value={senhaConfirm} onChange={e => setSenhaConfirm(e.target.value)} required
+                                    className="w-full px-4 py-3 border-2 border-slate-100 rounded-xl text-sm font-bold text-slate-900 focus:outline-none focus:border-black transition-all" />
+                            </div>
+                            {senhaErro && <p className="text-xs font-bold text-red-600 bg-red-50 border border-red-100 rounded-xl px-3 py-2">{senhaErro}</p>}
+                            {senhaSucesso && <p className="text-xs font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2">{senhaSucesso}</p>}
+                            <button type="submit" disabled={salvandoSenha}
+                                className="w-full bg-black text-white text-xs font-black uppercase tracking-widest py-3 rounded-xl hover:bg-slate-800 transition-all disabled:opacity-50 flex items-center justify-center gap-2">
+                                {salvandoSenha ? <><div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Salvando...</> : 'Salvar Nova Senha'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             <main className="max-w-6xl mx-auto px-4 sm:px-6 py-6">
 

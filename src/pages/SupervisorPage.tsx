@@ -6,6 +6,7 @@ import { useState, useMemo, useEffect, useCallback, type FormEvent } from 'react
 import { useAuth } from '../context/AuthContext';
 import { useSolicitacoes } from '../context/SolicitacoesContext';
 import { getTecnico, getCargaTecnico, getCatalogoMateriais, registrarTroca, getHistoricoTrocas } from '../lib/database-queries';
+import { supabase } from '../lib/supabase';
 import { calcularPrazoD1 } from '../mocks/database';
 import type { ItemCarga, Material, FormularioTroca } from '../types';
 
@@ -65,6 +66,8 @@ export default function SupervisorPage() {
     const [catalogoMateriais, setCatalogoMateriais] = useState<Material[]>([]);
     const [historicoSupabase, setHistoricoSupabase] = useState<any[]>([]);
 
+    const [notificacao, setNotificacao] = useState<{ id: string; texto: string } | null>(null);
+
     const fetchHistorico = useCallback(async () => {
         if (!usuario?.id) return;
         setLoading(true);
@@ -76,9 +79,53 @@ export default function SupervisorPage() {
         }
     }, [usuario]);
 
+    // Carrega histórico quando a aba abre
     useEffect(() => {
         if (tabAtiva === 'historico') fetchHistorico();
     }, [tabAtiva, fetchHistorico]);
+
+    // Supabase Realtime: escuta atualizações de status em tempo real
+    useEffect(() => {
+        if (!usuario?.id) return;
+
+        const labelStatus: Record<string, string> = {
+            pedido_em_andamento: '🔵 Pedido em andamento',
+            sem_estoque: '🔴 Sem estoque',
+            liberado_retirada: '🟢 Liberado p/ retirada',
+        };
+
+        const channel = supabase
+            .channel('historico-supervisor')
+            .on(
+                'postgres_changes',
+                {
+                    event: 'UPDATE',
+                    schema: 'public',
+                    table: 'historico_trocas',
+                    filter: `supervisor_id=eq.${usuario.id}`,
+                },
+                (payload) => {
+                    const updated = payload.new as any;
+                    // Atualiza o item na lista sem refetch
+                    setHistoricoSupabase((prev) =>
+                        prev.map((item) =>
+                            item.id === updated.id
+                                ? { ...item, status: updated.status }
+                                : item
+                        )
+                    );
+                    // Toast de notificação
+                    const texto = labelStatus[updated.status] || updated.status;
+                    setNotificacao({ id: updated.id, texto });
+                    setTimeout(() => setNotificacao(null), 5000);
+                }
+            )
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [usuario]);
 
     const minhasSolicitacoes = useMemo(
         () => buscarPorSupervisor(usuario?.matricula || ''),
@@ -232,6 +279,19 @@ export default function SupervisorPage() {
                     <div className="mb-6 flex items-center gap-3 text-sm bg-emerald-500 text-white rounded-xl px-4 py-4 shadow-lg shadow-emerald-200 animate-in fade-in slide-in-from-top-4 duration-300">
                         <div className="bg-white/20 p-1.5 rounded-full"><IconCheck /></div>
                         <span className="font-bold">{sucesso}</span>
+                    </div>
+                )}
+
+                {/* Toast Realtime — atualização de status pelo estoque */}
+                {notificacao && (
+                    <div className="fixed top-5 right-5 z-[100] flex items-start gap-3 bg-white border border-slate-200 rounded-2xl px-4 py-3 shadow-2xl shadow-slate-300/50 max-w-sm animate-in slide-in-from-right-4 duration-300">
+                        <span className="text-lg leading-none mt-0.5">🔔</span>
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Atualização do Estoque</p>
+                            <p className="text-sm font-black text-slate-900">{notificacao.texto}</p>
+                            <p className="text-[10px] text-slate-400 font-bold mt-0.5">Pedido #{notificacao.id.split('-')[0].toUpperCase()}</p>
+                        </div>
+                        <button onClick={() => setNotificacao(null)} className="ml-auto text-slate-300 hover:text-slate-600 transition-colors text-lg leading-none">&times;</button>
                     </div>
                 )}
 

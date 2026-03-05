@@ -30,7 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             // 1️⃣ Verifica usuarios_estoque PRIMEIRO
             // Todos que estão nessa tabela vão para o painel do estoque,
             // independente do cargo (SUPERVISOR JR, ALMOXARIFE, etc.)
-            const { data: estoque, error: errEst } = await supabase
+            const { data: estoque } = await supabase
                 .from('usuarios_estoque')
                 .select('*')
                 .eq('matricula', mat)
@@ -38,7 +38,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 .eq('ativo', true)
                 .single();
 
-            console.log('[Login] usuarios_estoque →', { estoque, errEst });
 
             if (estoque) {
                 setUsuario({
@@ -53,14 +52,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             }
 
             // 2️⃣ Só então verifica supervisores
-            const { data: supervisor, error: errSup } = await supabase
+            const { data: supervisor } = await supabase
                 .from('supervisores')
                 .select('*')
                 .eq('matricula', mat)
                 .eq('senha', senha)
                 .single();
 
-            console.log('[Login] supervisores →', { supervisor, errSup });
 
             if (supervisor) {
                 setUsuario({
@@ -76,8 +74,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
             return { success: false, error: 'Matrícula ou senha inválidos.' };
         } catch (err: any) {
-            console.error('[Login] erro inesperado →', err);
-            return { success: false, error: `Erro: ${err?.message || 'Conexão falhou.'}` };
+            return { success: false, error: err?.message || 'Erro de conexão. Tente novamente.' };
         }
     }, []);
 
