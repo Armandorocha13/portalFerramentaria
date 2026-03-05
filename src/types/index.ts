@@ -44,12 +44,20 @@ export interface Material {
     codigo: string;
     nome: string;
     categoria: string;
-    unidade: string;
-    descricao: string;
+    unidade?: string;
+    descricao?: string;
 }
 
-/** Status de uma solicitação de troca */
-export type SolicitacaoStatus = 'pendente' | 'aprovada' | 'rejeitada' | 'concluida';
+/** Status de uma solicitação de troca — gerenciado pelo estoque */
+export type SolicitacaoStatus =
+    | 'pedido_em_andamento'
+    | 'sem_estoque'
+    | 'liberado_retirada'
+    // legados (compatibilidade com registros antigos)
+    | 'pendente'
+    | 'aprovada'
+    | 'rejeitada'
+    | 'concluida';
 
 /** Solicitação de troca registrada */
 export interface SolicitacaoTroca {

@@ -22,77 +22,90 @@ export async function getTecnico(matricula: string, supervisorId: string): Promi
 
 /** 🛠️ Recupera a carga/saldo do técnico */
 export async function getCargaTecnico(tecnicoMatricula: string): Promise<ItemCarga[]> {
-    // Primeiro pegamos o ID do técnico
-    const { data: tecnico } = await supabase
-        .from('tecnicos')
-        .select('id')
-        .eq('matricula', tecnicoMatricula)
-        .single();
-
-    if (!tecnico) return [];
-
     const { data, error } = await supabase
         .from('carga_tecnicos')
         .select('*')
-        .eq('tecnico_id', tecnico.id);
+        .eq('matricula_tecnico', tecnicoMatricula);
 
     if (error || !data) return [];
 
     return data.map(item => ({
         id: item.id,
-        tecnicoMatricula,
-        materialId: item.id, // Em um sistema real, teríamos uma tabela de materiais vinculada
-        materialNome: item.material_nome,
-        quantidade: item.quantidade,
-        dataAtribuicao: item.data_atribuicao,
-        patrimonio: item.patrimonio,
+        tecnicoMatricula: item.matricula_tecnico,
+        materialId: item.codigo_material,
+        materialNome: item.descricao_material,
+        quantidade: parseInt(item.saldo) || 0,
+        dataAtribuicao: item.created_at,
+        patrimonio: '', // O campo patrimonio não veio no CSV básico
     }));
 }
 
 /** 📦 Lista catálogo de materiais (Entrada) */
 export async function getCatalogoMateriais(): Promise<Material[]> {
-    // Simulação ou busca em tabela de materiais se existir
+    // Busca materiais únicos da tabela de carga para servir como catálogo
     const { data, error } = await supabase
-        .from('materiais') // Criar esta tabela se necessário
-        .select('*');
+        .from('carga_tecnicos')
+        .select('codigo_material, descricao_material')
+        .limit(100); // Limite para não sobrecarregar
 
     if (error || !data) return [];
-    return data;
+
+    // Remove duplicados por nome
+    const unique = new Map();
+    data.forEach(item => {
+        if (!unique.has(item.descricao_material)) {
+            unique.set(item.descricao_material, {
+                id: item.codigo_material || item.descricao_material,
+                nome: item.descricao_material,
+                categoria: 'Geral',
+                codigo: item.codigo_material
+            });
+        }
+    });
+
+    return Array.from(unique.values());
 }
 
 /** 📝 Registra a troca no histórico */
 export async function registrarTroca(dados: {
-    supervisor_id: string;
+    supervisor_id: string; // UUID
+    supervisor_matricula: string;
+    supervisor_nome: string;
     tecnico_matricula: string;
     item_saida_id: string;
-    material_entrada_id: string;
+    material_entrada_nome: string;
     motivo: string;
 }) {
-    // Pegar ID do técnico pela matrícula
+    // Pegar informações do técnico
     const { data: tecnico } = await supabase
         .from('tecnicos')
         .select('id, nome')
-        .eq('matricula', dados.tecnico_matricula)
+        .eq('matricula', dados.tecnico_matricula.toUpperCase())
         .single();
 
     if (!tecnico) throw new Error('Técnico não encontrado.');
 
-    // Pegar nomes para o histórico simplificado
+    // Pegar nome do material de saída
     const { data: itemSaida } = await supabase
         .from('carga_tecnicos')
-        .select('material_nome')
+        .select('descricao_material')
         .eq('id', dados.item_saida_id)
         .single();
 
-    // Registrar no histórico
+    // Registrar no histórico com todos os detalhes solicitados
     const { data, error } = await supabase
         .from('historico_trocas')
         .insert({
             supervisor_id: dados.supervisor_id,
+            supervisor_matricula: dados.supervisor_matricula,
+            supervisor_nome: dados.supervisor_nome,
             tecnico_id: tecnico.id,
-            item_saida_nome: itemSaida?.material_nome || 'Item Desconhecido',
-            item_entrada_nome: dados.material_entrada_id, // Pode virar nome após busca
+            tecnico_matricula: dados.tecnico_matricula,
+            tecnico_nome: tecnico.nome,
+            item_saida_nome: itemSaida?.descricao_material || 'Item Desconhecido',
+            item_entrada_nome: dados.material_entrada_nome,
             motivo: dados.motivo,
+            status: 'pedido_em_andamento', // Estado inicial — estoque irá atualizar
         })
         .select()
         .single();
@@ -115,12 +128,14 @@ export async function getHistoricoTrocas(supervisorId: string): Promise<any[]> {
     if (error || !data) return [];
     return data.map(item => ({
         id: item.id,
-        tecnicoNome: item.tecnico.nome,
-        tecnicoMatricula: item.tecnico.matricula,
+        tecnicoNome: item.tecnico_nome || (item.tecnico ? item.tecnico.nome : 'N/A'),
+        tecnicoMatricula: item.tecnico_matricula || (item.tecnico ? item.tecnico.matricula : 'N/A'),
+        supervisorNome: item.supervisor_nome,
+        supervisorMatricula: item.supervisor_matricula,
         itemSaidaNome: item.item_saida_nome,
         materialEntradaNome: item.item_entrada_nome,
         dataSolicitacao: item.data_troca,
-        prazoResolucao: item.data_troca, // Simplificado
-        status: 'concluida',
+        prazoResolucao: item.data_troca, // Simplificado, ideal calcular D+1 se necessário
+        status: item.status || 'pedido_em_andamento',
     }));
 }

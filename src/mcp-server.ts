@@ -75,7 +75,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
       },
       {
         name: "registrar_troca_ferramenta",
-        description: "Processa a solicitação de troca de uma ferramenta, registrando o motivo e vinculando ao supervisor responsável.",
+        description: "Processa a solicitação de troca de uma ferramenta, registrando o Jutificativa e vinculando ao supervisor responsável.",
         inputSchema: {
           type: "object",
           properties: {
@@ -83,9 +83,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => {
             tecnico_matricula: { type: "string" },
             item_saida_id: { type: "string", description: "O ID do item que está saindo da carga" },
             material_entrada_id: { type: "string", description: "O ID do novo material que será entregue" },
-            motivo: { type: "string" },
+            Jutificativa: { type: "string" },
           },
-          required: ["supervisor_matricula", "tecnico_matricula", "item_saida_id", "material_entrada_id", "motivo"],
+          required: ["supervisor_matricula", "tecnico_matricula", "item_saida_id", "material_entrada_id", "Jutificativa"],
         },
       },
     ],
@@ -126,9 +126,9 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
     }
 
     if (name === "registrar_troca_ferramenta") {
-      const { motivo } = z.object({ motivo: z.string() }).parse(args);
+      const { Jutificativa } = z.object({ Jutificativa: z.string() }).parse(args);
       return {
-        content: [{ type: "text", text: `Solicitação de troca registrada com sucesso. Motivo: ${motivo}. Status: PENDENTE.` }],
+        content: [{ type: "text", text: `Solicitação de troca registrada com sucesso. Jutificativa: ${Jutificativa}. Status: PENDENTE.` }],
       };
     }
 

@@ -12,10 +12,12 @@
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@supabase/mcp-server-supabase": "^0.7.0",
     "@supabase/supabase-js": "^2.98.0",
+    "csv-parse": "^6.1.0",
     "dotenv": "^17.3.1",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "tsx": "^4.21.0",
+    "xlsx": "^0.18.5",
     "zod": "^4.3.6"
   },
   "devDependencies": {
