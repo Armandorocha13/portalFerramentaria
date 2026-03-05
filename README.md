@@ -64,6 +64,16 @@ docker run -p 8080:80 -d --name portal_webapp portal-ferramentaria:latest
 ```
 Após o sucesso do comando, a interface de uso portará disponibilidade em `http://localhost:8080`.
 
+**5.3. Orquestração via Docker Compose (Recomendado):**
+
+Alternativamente, para ambientes que necessitem de reinicialização automática e monitoramento de saúde do serviço, o repositório disponibiliza um arquivo `docker-compose.yml`. Basta executar:
+
+```bash
+docker compose up -d --build
+```
+
+O serviço será compilado, iniciado e monitorado automaticamente. O parâmetro `restart: unless-stopped` assegura que o contêiner será reiniciado em caso de falha ou reinicialização do host.
+
 ---
 
 ## 6. Procedimentos de Execução em Ambiente de Desenvolvimento
