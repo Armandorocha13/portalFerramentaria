@@ -1,4 +1,4 @@
-// ============================================================
+﻿// ============================================================
 // PÁGINA DE LOGIN — Autenticação com Background + Liquid Glass
 // ============================================================
 
@@ -40,7 +40,7 @@ export default function LoginPage() {
             }}
         >
             {/* Overlay escuro para contraste */}
-            <div className="absolute inset-0 bg-black/40" />
+            <div className="absolute inset-0 bg-woodsmoke-950/40" />
 
             {/* Card Liquid Glass */}
             <div

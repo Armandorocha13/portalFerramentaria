@@ -2,7 +2,58 @@
 @tailwind components;
 @tailwind utilities;
 
-* {
+/* =============================================
+   VARIÁVEIS GLOBAIS DO TEMA CORPORATIVO
+   ============================================= */
+:root {
+  /* Primário (azul-ardósia neutro) */
+  --color-brand: #2e4259;
+  --color-brand-light: #3f5a74;
+  --color-brand-subtle: #f1f4f9;
+
+  /* Superfície */
+  --color-bg: #f8f9fb;
+  --color-surface: #ffffff;
+  --color-border: #e4e8ed;
+  --color-border-soft: #f1f3f6;
+
+  /* Texto */
+  --color-text-primary: #1a202c;
+  --color-text-secondary: #4a5568;
+  --color-text-muted: #9aa5b1;
+
+  /* Ação primária */
+  --color-action: #2e4259;
+  --color-action-hover: #1e2d3e;
+
+  /* Status — pastéis desaturados */
+  --status-pending-bg: #f0f4f8;
+  --status-pending-text: #374a5e;
+  --status-pending-border: #c8d4e3;
+
+  --status-nostock-bg: #fdf0f0;
+  --status-nostock-text: #7a3535;
+  --status-nostock-border: #e8c5c5;
+
+  --status-ready-bg: #f0f7f1;
+  --status-ready-text: #2d5a35;
+  --status-ready-border: #b6d9bb;
+
+  --status-done-bg: #f5f0fb;
+  --status-done-text: #4a3470;
+  --status-done-border: #c8b8e8;
+
+  --status-expired-bg: #fdf6ee;
+  --status-expired-text: #7a4d19;
+  --status-expired-border: #e8c89a;
+}
+
+/* =============================================
+   RESET BASE
+   ============================================= */
+*,
+*::before,
+*::after {
   margin: 0;
   padding: 0;
   box-sizing: border-box;
@@ -10,45 +61,36 @@
 
 html,
 body {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-  font-family: 'Inter', sans-serif;
-  background-color: #ffffff;
-  color: #0f172a;
+  font-family: 'Inter', system-ui, sans-serif;
+  background-color: var(--color-bg);
+  color: var(--color-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   overflow-x: hidden;
   width: 100%;
 }
 
-*,
-*::before,
-*::after {
-  box-sizing: inherit;
-}
-
-
-
-/* Scrollbar minimalista */
+/* =============================================
+   SCROLLBAR MINIMALISTA
+   ============================================= */
 ::-webkit-scrollbar {
-  width: 6px;
+  width: 5px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f8fafc;
+  background: var(--color-bg);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #cbd5e1;
-  border-radius: 3px;
+  background: var(--color-border);
+  border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #94a3b8;
+  background: var(--color-text-muted);
 }
 
-/* Utilitários de Responsividade */
+/* Esconder scrollbar mantendo funcionalidade */
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
@@ -56,4 +98,81 @@ body {
 .no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
+}
+
+/* =============================================
+   COMPONENTES PADRÃO (classes utilitárias)
+   ============================================= */
+
+/* Status badges — pastéis corporativos */
+.badge-pending {
+  @apply inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap;
+  background: var(--status-pending-bg);
+  color: var(--status-pending-text);
+  border-color: var(--status-pending-border);
+}
+
+.badge-nostock {
+  @apply inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap;
+  background: var(--status-nostock-bg);
+  color: var(--status-nostock-text);
+  border-color: var(--status-nostock-border);
+}
+
+.badge-ready {
+  @apply inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap;
+  background: var(--status-ready-bg);
+  color: var(--status-ready-text);
+  border-color: var(--status-ready-border);
+}
+
+.badge-done {
+  @apply inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap;
+  background: var(--status-done-bg);
+  color: var(--status-done-text);
+  border-color: var(--status-done-border);
+}
+
+.badge-expired {
+  @apply inline-flex items-center gap-1.5 text-[10px] font-bold px-2.5 py-1 rounded-full border whitespace-nowrap;
+  background: var(--status-expired-bg);
+  color: var(--status-expired-text);
+  border-color: var(--status-expired-border);
+}
+
+/* Botão primário corporativo */
+.btn-primary {
+  @apply inline-flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-lg transition-all;
+  background: var(--color-brand);
+  color: #ffffff;
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: var(--color-action-hover);
+  @apply shadow-sm;
+}
+
+.btn-primary:disabled {
+  @apply opacity-50 cursor-not-allowed;
+}
+
+/* Botão secundário (outline) */
+.btn-secondary {
+  @apply inline-flex items-center gap-2 text-xs font-semibold px-4 py-2 rounded-lg border transition-all;
+  border-color: var(--color-border);
+  color: var(--color-text-secondary);
+  background: var(--color-surface);
+}
+
+.btn-secondary:hover:not(:disabled) {
+  border-color: var(--color-brand);
+  color: var(--color-brand);
+  @apply shadow-sm;
+}
+
+/* Card padrão */
+.card {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  @apply rounded-2xl shadow-card;
 }
