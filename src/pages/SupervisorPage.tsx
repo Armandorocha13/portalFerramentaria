@@ -576,95 +576,272 @@ export default function SupervisorPage() {
 
                 {/* ====== TAB: Histórico / Acompanhamento ====== */}
                 {tabAtiva === 'historico' && (
-                    <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                        <div className="flex items-center justify-between mb-6">
-                            <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Solicitações Registradas</h2>
-                            <span className="bg-slate-200/50 text-slate-600 text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-wider">
-                                Total: {historicoSupabase.length}
-                            </span>
-                        </div>
-
-                        {historicoSupabase.length === 0 ? (
-                            <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-16 text-center">
-                                <p className="text-slate-400 font-black uppercase tracking-widest text-sm mb-4">Nenhuma solicitação encontrada</p>
-                                <button
-                                    onClick={() => setTabAtiva('nova')}
-                                    className="bg-black text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-black/10"
-                                >
-                                    Criar Primeira Solicitação
-                                </button>
-                            </div>
-                        ) : (
-                            <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xl shadow-slate-200/40">
-                                {/* Desktop Table */}
-                                <div className="hidden lg:block">
-                                    <table className="w-full text-left">
-                                        <thead>
-                                            <tr className="border-b border-slate-100 bg-slate-50/50">
-                                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">ID</th>
-                                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Colaborador</th>
-                                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Supervisor</th>
-                                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Item Trocado</th>
-                                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Data</th>
-                                                <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-slate-50">
-                                            {historicoSupabase.map((sol) => (
-                                                <tr key={sol.id} className="hover:bg-slate-50 transition-colors">
-                                                    <td className="px-6 py-6 font-mono text-[10px] font-black text-slate-400">{sol.id.split('-')[0].toUpperCase()}</td>
-                                                    <td className="px-6 py-6">
-                                                        <p className="text-sm font-black text-slate-900 uppercase tracking-tight">{sol.tecnicoNome}</p>
-                                                        <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">{sol.tecnicoMatricula}</p>
-                                                    </td>
-                                                    <td className="px-6 py-6">
-                                                        <p className="text-sm font-black text-slate-700 uppercase">{sol.supervisorNome ?? '—'}</p>
-                                                        <p className="text-[10px] text-slate-400 font-bold mt-1">{sol.supervisorMatricula ?? ''}</p>
-                                                    </td>
-                                                    <td className="px-6 py-6">
-                                                        <p className="text-xs font-black text-slate-700 uppercase">{sol.itemSaidaNome}</p>
-                                                        <p className="text-[9px] text-emerald-500 font-black uppercase mt-1">✓ Reposição  </p>
-                                                    </td>
-                                                    <td className="px-6 py-6">
-                                                        <p className="text-xs font-bold text-slate-900">{new Date(sol.dataSolicitacao).toLocaleDateString('pt-BR')}</p>
-                                                    </td>
-                                                    <td className="px-6 py-6">
-                                                        <StatusBadge status={sol.status} />
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-
-                                {/* Mobile List */}
-                                <div className="lg:hidden divide-y divide-slate-100">
-                                    {historicoSupabase.map((sol) => (
-                                        <div key={sol.id} className="p-6 space-y-4">
-                                            <div className="flex items-start justify-between">
-                                                <div>
-                                                    <span className="font-mono text-[10px] font-black text-slate-300">#{sol.id.split('-')[0].toUpperCase()}</span>
-                                                    <h3 className="text-sm font-black text-slate-900 uppercase mt-1">{sol.tecnicoNome}</h3>
-                                                    <p className="text-[10px] text-slate-400 font-bold">{sol.tecnicoMatricula}</p>
-                                                </div>
-                                                <StatusBadge status={sol.status} />
-                                            </div>
-                                            <div className="bg-slate-50 rounded-2xl p-4 border border-slate-100">
-                                                <p className="text-[9px] font-black text-slate-400 uppercase mb-2 tracking-widest">Material Trocado</p>
-                                                <p className="text-xs font-black text-slate-800 uppercase leading-tight">{sol.itemSaidaNome}</p>
-                                            </div>
-                                            <div className="flex items-center justify-between">
-                                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Data do Registro</p>
-                                                <p className="text-[10px] font-black text-slate-900">{new Date(sol.dataSolicitacao).toLocaleDateString('pt-BR')}</p>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-                    </div>
+                    <HistoricoSection
+                        dados={historicoSupabase}
+                        loading={loading}
+                        onNovaSolicitacao={() => setTabAtiva('nova')}
+                    />
                 )}
             </main>
+        </div>
+    );
+}
+
+// ---- HistoricoSection: filtros + paginação + CSV ----
+const ITENS_POR_PAGINA = 10;
+
+const LABEL_STATUS: Record<string, string> = {
+    pedido_em_andamento: 'Em andamento',
+    sem_estoque: 'Sem estoque',
+    liberado_retirada: 'Liberado p/ retirada',
+    pendente: 'Em andamento',
+    aprovada: 'Liberado p/ retirada',
+    rejeitada: 'Sem estoque',
+    concluida: 'Em andamento',
+};
+
+function exportarCSV(dados: any[]) {
+    const cabecalho = ['ID', 'Técnico', 'Matrícula Técnico', 'Supervisor', 'Item Saída', 'Motivo', 'Status', 'Data'];
+    const linhas = dados.map((s) => [
+        s.id.split('-')[0].toUpperCase(),
+        s.tecnicoNome,
+        s.tecnicoMatricula,
+        s.supervisorNome ?? '',
+        s.itemSaidaNome,
+        s.motivo ?? '',
+        LABEL_STATUS[s.status] ?? s.status,
+        new Date(s.dataSolicitacao).toLocaleDateString('pt-BR'),
+    ]);
+    const conteudo = [cabecalho, ...linhas].map((r) => r.map((v: string) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + conteudo], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `historico_trocas_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function HistoricoSection({ dados, loading, onNovaSolicitacao }: { dados: any[]; loading: boolean; onNovaSolicitacao: () => void }) {
+    const [busca, setBusca] = useState('');
+    const [filtroStatus, setFiltroStatus] = useState('');
+    const [filtroData, setFiltroData] = useState('');
+    const [pagina, setPagina] = useState(1);
+
+    const filtrados = useMemo(() => {
+        const q = busca.toLowerCase().trim();
+        return dados.filter((s) => {
+            const matchBusca = !q || s.tecnicoNome?.toLowerCase().includes(q) || s.tecnicoMatricula?.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
+            const matchStatus = !filtroStatus || s.status === filtroStatus;
+            const matchData = !filtroData || s.dataSolicitacao?.startsWith(filtroData);
+            return matchBusca && matchStatus && matchData;
+        });
+    }, [dados, busca, filtroStatus, filtroData]);
+
+    // Resetar página ao mudar filtro
+    const totalPaginas = Math.max(1, Math.ceil(filtrados.length / ITENS_POR_PAGINA));
+    const paginaAtual = Math.min(pagina, totalPaginas);
+    const paginados = filtrados.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA);
+
+    function limparFiltros() { setBusca(''); setFiltroStatus(''); setFiltroData(''); setPagina(1); }
+
+    if (loading) return (
+        <div className="bg-white border border-slate-200 rounded-3xl p-16 text-center">
+            <div className="w-8 h-8 border-2 border-slate-200 border-t-slate-700 rounded-full animate-spin mx-auto mb-4" />
+            <p className="text-sm text-slate-400 font-black uppercase tracking-widest">Carregando...</p>
+        </div>
+    );
+
+    return (
+        <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
+            {/* Cabeçalho com filtros */}
+            <div className="flex flex-col gap-4 mb-6">
+                <div className="flex items-center justify-between flex-wrap gap-3">
+                    <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Solicitações Registradas</h2>
+                    <div className="flex items-center gap-2">
+                        <span className="bg-slate-200/50 text-slate-600 text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-wider">
+                            {filtrados.length} de {dados.length}
+                        </span>
+                        <button
+                            onClick={() => exportarCSV(filtrados)}
+                            disabled={filtrados.length === 0}
+                            title="Exportar CSV"
+                            className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-2 rounded-xl border-2 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-all disabled:opacity-40"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Exportar CSV
+                        </button>
+                    </div>
+                </div>
+
+                {/* Barra de filtros */}
+                <div className="flex flex-col sm:flex-row gap-2">
+                    <div className="relative grow">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z" />
+                        </svg>
+                        <input
+                            type="text"
+                            value={busca}
+                            onChange={(e) => { setBusca(e.target.value); setPagina(1); }}
+                            placeholder="Buscar por técnico ou ID..."
+                            className="w-full pl-9 pr-3 py-2.5 text-xs font-bold border-2 border-slate-100 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-slate-300 transition-all"
+                        />
+                    </div>
+                    <select
+                        value={filtroStatus}
+                        onChange={(e) => { setFiltroStatus(e.target.value); setPagina(1); }}
+                        className="px-3 py-2.5 text-[11px] font-black uppercase tracking-wider border-2 border-slate-100 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-slate-300 transition-all cursor-pointer"
+                    >
+                        <option value="">Todos os status</option>
+                        <option value="pedido_em_andamento">🔵 Em andamento</option>
+                        <option value="sem_estoque">🔴 Sem estoque</option>
+                        <option value="liberado_retirada">🟢 Liberado p/ retirada</option>
+                    </select>
+                    <input
+                        type="date"
+                        value={filtroData}
+                        onChange={(e) => { setFiltroData(e.target.value); setPagina(1); }}
+                        className="px-3 py-2.5 text-[11px] font-black border-2 border-slate-100 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-slate-300 transition-all"
+                    />
+                    {(busca || filtroStatus || filtroData) && (
+                        <button onClick={limparFiltros} className="text-[10px] font-black uppercase tracking-wider px-3 py-2 rounded-xl border-2 border-slate-200 text-slate-500 hover:bg-slate-50 transition-all whitespace-nowrap">
+                            Limpar
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {filtrados.length === 0 ? (
+                <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-16 text-center">
+                    <p className="text-slate-400 font-black uppercase tracking-widest text-sm mb-3">Nenhum resultado encontrado</p>
+                    {dados.length === 0 ? (
+                        <button onClick={onNovaSolicitacao} className="bg-black text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">
+                            Criar Primeira Solicitação
+                        </button>
+                    ) : (
+                        <button onClick={limparFiltros} className="text-[10px] font-black uppercase tracking-wider px-4 py-2 rounded-xl border-2 border-slate-200 text-slate-500 hover:bg-slate-50 transition-all">
+                            Limpar filtros
+                        </button>
+                    )}
+                </div>
+            ) : (
+                <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xl shadow-slate-200/40">
+                    {/* Desktop Table */}
+                    <div className="hidden lg:block">
+                        <table className="w-full text-left">
+                            <thead>
+                                <tr className="border-b border-slate-100 bg-slate-50/50">
+                                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">ID</th>
+                                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Colaborador</th>
+                                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Supervisor</th>
+                                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Item Trocado</th>
+                                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Data</th>
+                                    <th className="px-6 py-5 text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-50">
+                                {paginados.map((sol) => (
+                                    <tr key={sol.id} className="hover:bg-slate-50 transition-colors">
+                                        <td className="px-6 py-5 font-mono text-[10px] font-black text-slate-400">{sol.id.split('-')[0].toUpperCase()}</td>
+                                        <td className="px-6 py-5">
+                                            <p className="text-sm font-black text-slate-900 uppercase tracking-tight">{sol.tecnicoNome}</p>
+                                            <p className="text-[10px] text-slate-400 font-bold uppercase tracking-wider mt-1">{sol.tecnicoMatricula}</p>
+                                        </td>
+                                        <td className="px-6 py-5">
+                                            <p className="text-sm font-black text-slate-700 uppercase">{sol.supervisorNome ?? '—'}</p>
+                                            <p className="text-[10px] text-slate-400 font-bold mt-1">{sol.supervisorMatricula ?? ''}</p>
+                                        </td>
+                                        <td className="px-6 py-5">
+                                            <p className="text-xs font-black text-slate-700 uppercase">{sol.itemSaidaNome}</p>
+                                            <p className="text-[9px] text-emerald-500 font-black uppercase mt-1">✓ Reposição</p>
+                                        </td>
+                                        <td className="px-6 py-5">
+                                            <p className="text-xs font-bold text-slate-900">{new Date(sol.dataSolicitacao).toLocaleDateString('pt-BR')}</p>
+                                        </td>
+                                        <td className="px-6 py-5"><StatusBadge status={sol.status} /></td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    {/* Mobile List */}
+                    <div className="lg:hidden divide-y divide-slate-100">
+                        {paginados.map((sol) => (
+                            <div key={sol.id} className="p-5 space-y-3">
+                                <div className="flex items-start justify-between">
+                                    <div>
+                                        <span className="font-mono text-[10px] font-black text-slate-300">#{sol.id.split('-')[0].toUpperCase()}</span>
+                                        <h3 className="text-sm font-black text-slate-900 uppercase mt-1">{sol.tecnicoNome}</h3>
+                                        <p className="text-[10px] text-slate-400 font-bold">{sol.tecnicoMatricula}</p>
+                                    </div>
+                                    <StatusBadge status={sol.status} />
+                                </div>
+                                <div className="bg-slate-50 rounded-xl p-3 border border-slate-100">
+                                    <p className="text-[9px] font-black text-slate-400 uppercase mb-1 tracking-widest">Material</p>
+                                    <p className="text-xs font-black text-slate-800 uppercase">{sol.itemSaidaNome}</p>
+                                </div>
+                                <p className="text-[10px] font-bold text-slate-400">{new Date(sol.dataSolicitacao).toLocaleDateString('pt-BR')}</p>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Paginação */}
+                    {totalPaginas > 1 && (
+                        <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/30">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                Pág. {paginaAtual} de {totalPaginas} · {filtrados.length} registros
+                            </span>
+                            <div className="flex items-center gap-1">
+                                <button
+                                    onClick={() => setPagina(1)}
+                                    disabled={paginaAtual === 1}
+                                    className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" /></svg>
+                                </button>
+                                <button
+                                    onClick={() => setPagina((p) => Math.max(1, p - 1))}
+                                    disabled={paginaAtual === 1}
+                                    className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                                </button>
+                                {Array.from({ length: Math.min(5, totalPaginas) }, (_, i) => {
+                                    const inicio = Math.max(1, Math.min(paginaAtual - 2, totalPaginas - 4));
+                                    const num = inicio + i;
+                                    return num <= totalPaginas ? (
+                                        <button
+                                            key={num}
+                                            onClick={() => setPagina(num)}
+                                            className={`w-8 h-8 rounded-lg text-[11px] font-black transition-all ${num === paginaAtual ? 'bg-black text-white' : 'text-slate-500 hover:bg-slate-100'}`}
+                                        >
+                                            {num}
+                                        </button>
+                                    ) : null;
+                                })}
+                                <button
+                                    onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
+                                    disabled={paginaAtual === totalPaginas}
+                                    className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                                </button>
+                                <button
+                                    onClick={() => setPagina(totalPaginas)}
+                                    disabled={paginaAtual === totalPaginas}
+                                    className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M6 5l7 7-7 7" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
         </div>
     );
 }
