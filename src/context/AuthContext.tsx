@@ -24,31 +24,60 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             return { success: false, error: 'Preencha matrícula e senha.' };
         }
 
+        const mat = matricula.trim().toUpperCase();
+
         try {
-            const { data, error } = await supabase
-                .from('supervisores')
+            // 1️⃣ Verifica usuarios_estoque PRIMEIRO
+            // Todos que estão nessa tabela vão para o painel do estoque,
+            // independente do cargo (SUPERVISOR JR, ALMOXARIFE, etc.)
+            const { data: estoque, error: errEst } = await supabase
+                .from('usuarios_estoque')
                 .select('*')
-                .eq('matricula', matricula.trim().toUpperCase())
-                .eq('senha', senha) // No mundo real, usaríamos hash e Auth do Supabase
+                .eq('matricula', mat)
+                .eq('senha', senha)
+                .eq('ativo', true)
                 .single();
 
-            if (error || !data) {
-                return { success: false, error: 'Matrícula ou senha inválidos, ou você não é supervisor.' };
+            console.log('[Login] usuarios_estoque →', { estoque, errEst });
+
+            if (estoque) {
+                setUsuario({
+                    id: estoque.id,
+                    matricula: estoque.matricula,
+                    nome: estoque.nome,
+                    senha: '',
+                    setor: estoque.cargo,
+                    perfil: 'estoque',
+                });
+                return { success: true };
             }
 
-            const user: Usuario = {
-                id: data.id, // Store Supabase UUID
-                matricula: data.matricula,
-                nome: data.nome,
-                senha: '', // Não expor senha no estado
-                setor: data.setor || 'Geral',
-                perfil: 'supervisor',
-            };
+            // 2️⃣ Só então verifica supervisores
+            const { data: supervisor, error: errSup } = await supabase
+                .from('supervisores')
+                .select('*')
+                .eq('matricula', mat)
+                .eq('senha', senha)
+                .single();
 
-            setUsuario(user);
-            return { success: true };
-        } catch (err) {
-            return { success: false, error: 'Erro de conexão com o banco de dados.' };
+            console.log('[Login] supervisores →', { supervisor, errSup });
+
+            if (supervisor) {
+                setUsuario({
+                    id: supervisor.id,
+                    matricula: supervisor.matricula,
+                    nome: supervisor.nome,
+                    senha: '',
+                    setor: supervisor.setor || 'Geral',
+                    perfil: 'supervisor',
+                });
+                return { success: true };
+            }
+
+            return { success: false, error: 'Matrícula ou senha inválidos.' };
+        } catch (err: any) {
+            console.error('[Login] erro inesperado →', err);
+            return { success: false, error: `Erro: ${err?.message || 'Conexão falhou.'}` };
         }
     }, []);
 
