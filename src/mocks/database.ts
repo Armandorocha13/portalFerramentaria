@@ -5,9 +5,9 @@
 import type { Usuario, Supervisor, Tecnico, ItemCarga, Material } from '../types';
 
 // ---- USUÁRIOS DO SISTEMA (login unificado por matrícula) ----
-export const usuarios: Usuario[] = [
-    // ── Supervisores ──
+const usuarios: Usuario[] = [
     {
+        id: 'mock-id-sup001',
         matricula: 'SUP001',
         nome: 'Carlos Eduardo Mendes',
         senha: '123456',
@@ -15,6 +15,7 @@ export const usuarios: Usuario[] = [
         perfil: 'supervisor',
     },
     {
+        id: 'mock-id-sup002',
         matricula: 'SUP002',
         nome: 'Ana Paula Ferreira',
         senha: '123456',
@@ -22,6 +23,7 @@ export const usuarios: Usuario[] = [
         perfil: 'supervisor',
     },
     {
+        id: 'mock-id-sup003',
         matricula: 'SUP003',
         nome: 'Roberto Silva Neto',
         senha: '123456',
@@ -30,6 +32,7 @@ export const usuarios: Usuario[] = [
     },
     // ── Estoque / Ferramentaria ──
     {
+        id: 'mock-id-est001',
         matricula: 'EST001',
         nome: 'Marcos Vinícius Lopes',
         senha: '123456',
@@ -37,6 +40,7 @@ export const usuarios: Usuario[] = [
         perfil: 'estoque',
     },
     {
+        id: 'mock-id-est002',
         matricula: 'EST002',
         nome: 'Juliana Ramos Cardoso',
         senha: '123456',
@@ -46,12 +50,12 @@ export const usuarios: Usuario[] = [
 ];
 
 // Manter array de supervisores derivado para compatibilidade
-export const supervisores: Supervisor[] = usuarios
+const supervisores: Supervisor[] = usuarios
     .filter((u) => u.perfil === 'supervisor')
     .map(({ matricula, nome, senha, setor }) => ({ matricula, nome, senha, setor }));
 
 // ---- TÉCNICOS ----
-export const tecnicos: Tecnico[] = [
+const tecnicos: Tecnico[] = [
     {
         matricula: 'TEC001',
         nome: 'João Pedro Almeida',
@@ -104,7 +108,7 @@ export const tecnicos: Tecnico[] = [
 ];
 
 // ---- CATÁLOGO DE MATERIAIS ----
-export const materiais: Material[] = [
+const materiais: Material[] = [
     {
         id: 'MAT001',
         codigo: 'FER-001',
@@ -204,7 +208,7 @@ export const materiais: Material[] = [
 ];
 
 // ---- SNAPSHOT DE CARGA (itens por técnico) ----
-export const itensCarga: ItemCarga[] = [
+const itensCarga: ItemCarga[] = [
     // --- TEC001 - João Pedro ---
     {
         id: 'CAR001',
@@ -336,50 +340,60 @@ export const itensCarga: ItemCarga[] = [
 // ---- FUNÇÕES AUXILIARES DO MOCK ----
 
 /** Autentica um usuário pelo matrícula e senha (unificado) */
-export function autenticarUsuario(matricula: string, senha: string): Usuario | null {
+function autenticarUsuario(matricula: string, senha: string): Usuario | null {
     return usuarios.find(
         (u) => u.matricula.toUpperCase() === matricula.toUpperCase() && u.senha === senha
     ) ?? null;
 }
 
 /** Autentica um supervisor pelo matrícula e senha (compatibilidade) */
-export function autenticarSupervisor(matricula: string, senha: string): Supervisor | null {
+function autenticarSupervisor(matricula: string, senha: string): Supervisor | null {
     return supervisores.find(
         (s) => s.matricula.toUpperCase() === matricula.toUpperCase() && s.senha === senha
     ) ?? null;
 }
 
 /** Busca técnico pela matrícula */
-export function buscarTecnico(matricula: string): Tecnico | null {
+function buscarTecnico(matricula: string): Tecnico | null {
     return tecnicos.find(
         (t) => t.matricula.toUpperCase() === matricula.toUpperCase()
     ) ?? null;
 }
 
 /** Retorna os itens de carga de um técnico */
-export function buscarCargaTecnico(tecnicoMatricula: string): ItemCarga[] {
+function buscarCargaTecnico(tecnicoMatricula: string): ItemCarga[] {
     return itensCarga.filter(
         (item) => item.tecnicoMatricula.toUpperCase() === tecnicoMatricula.toUpperCase()
     );
 }
 
 /** Busca um material pelo ID */
-export function buscarMaterial(materialId: string): Material | null {
+function buscarMaterial(materialId: string): Material | null {
     return materiais.find((m) => m.id === materialId) ?? null;
 }
 
 /** Retorna todos os materiais do catálogo */
-export function listarMateriais(): Material[] {
+function listarMateriais(): Material[] {
     return materiais;
 }
 
 /** Gera data D+1 (próximo dia útil simplificado) */
 export function calcularPrazoD1(dataSolicitacao: string): string {
-    const data = new Date(dataSolicitacao);
-    data.setDate(data.getDate() + 1);
-    // Se cair no sábado, pula pra segunda
-    if (data.getDay() === 6) data.setDate(data.getDate() + 2);
-    // Se cair no domingo, pula pra segunda
-    if (data.getDay() === 0) data.setDate(data.getDate() + 1);
+    // Força o horário para o meio-dia UTC para evitar problemas de fuso (-3h) caindo no dia anterior
+    const data = new Date(dataSolicitacao.split('T')[0] + 'T12:00:00Z');
+
+    const diaSemana = data.getUTCDay(); // 0=Domingo, 1=Segunda ... 5=Sexta, 6=Sábado
+
+    if (diaSemana === 5) {
+        // Sexta -> Pula sábado e domingo (+3 dias)
+        data.setUTCDate(data.getUTCDate() + 3);
+    } else if (diaSemana === 6) {
+        // Sábado -> Pula domingo (+2 dias)
+        data.setUTCDate(data.getUTCDate() + 2);
+    } else {
+        // Domingo a Quinta -> Dia seguinte normal (+1 dia)
+        data.setUTCDate(data.getUTCDate() + 1);
+    }
+
     return data.toISOString().split('T')[0];
 }

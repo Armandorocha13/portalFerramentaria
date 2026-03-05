@@ -20,3 +20,9 @@ npm-debug.log*
 # Sistema
 .DS_Store
 Thumbs.db
+
+# Arquivos de dados brutos (não devem entrar no repositório)
+*.xlsx
+*.csv
+carga_consolidada*
+sup.xlsx

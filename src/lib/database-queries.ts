@@ -41,7 +41,7 @@ export async function getCargaTecnico(tecnicoMatricula: string): Promise<ItemCar
 }
 
 /** 📦 Lista catálogo de materiais (Entrada) */
-export async function getCatalogoMateriais(): Promise<Material[]> {
+async function getCatalogoMateriais(): Promise<Material[]> {
     // Busca materiais únicos da tabela de carga para servir como catálogo
     const { data, error } = await supabase
         .from('carga_tecnicos')
@@ -114,28 +114,35 @@ export async function registrarTroca(dados: {
     return data;
 }
 
-/** 📜 Recupera o histórico de trocas do supervisor */
-export async function getHistoricoTrocas(supervisorId: string): Promise<any[]> {
-    const { data, error } = await supabase
+/** 📜 Recupera o histórico de trocas do supervisor com paginação */
+export async function getHistoricoTrocas(supervisorId: string, page = 1, pageSize = 10): Promise<{ data: any[], count: number }> {
+    const start = (page - 1) * pageSize;
+    const end = start + pageSize - 1;
+
+    const { data, count, error } = await supabase
         .from('historico_trocas')
         .select(`
             *,
             tecnico:tecnico_id (nome, matricula)
-        `)
+        `, { count: 'exact' })
         .eq('supervisor_id', supervisorId)
-        .order('data_troca', { ascending: false });
+        .order('data_troca', { ascending: false })
+        .range(start, end);
 
-    if (error || !data) return [];
-    return data.map(item => ({
-        id: item.id,
-        tecnicoNome: item.tecnico_nome || (item.tecnico ? item.tecnico.nome : 'N/A'),
-        tecnicoMatricula: item.tecnico_matricula || (item.tecnico ? item.tecnico.matricula : 'N/A'),
-        supervisorNome: item.supervisor_nome,
-        supervisorMatricula: item.supervisor_matricula,
-        itemSaidaNome: item.item_saida_nome,
-        materialEntradaNome: item.item_entrada_nome,
-        dataSolicitacao: item.data_troca,
-        prazoResolucao: item.data_troca, // Simplificado, ideal calcular D+1 se necessário
-        status: item.status || 'pedido_em_andamento',
-    }));
+    if (error || !data) return { data: [], count: 0 };
+    return {
+        data: data.map(item => ({
+            id: item.id,
+            tecnicoNome: item.tecnico_nome || (item.tecnico ? item.tecnico.nome : 'N/A'),
+            tecnicoMatricula: item.tecnico_matricula || (item.tecnico ? item.tecnico.matricula : 'N/A'),
+            supervisorNome: item.supervisor_nome,
+            supervisorMatricula: item.supervisor_matricula,
+            itemSaidaNome: item.item_saida_nome,
+            materialEntradaNome: item.item_entrada_nome,
+            dataSolicitacao: item.data_troca,
+            prazoResolucao: item.data_troca, // Simplificado, ideal calcular D+1 se necessário
+            status: item.status || 'pedido_em_andamento',
+        })),
+        count: count || 0
+    };
 }
