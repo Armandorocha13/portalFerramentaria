@@ -587,63 +587,14 @@ export default function SupervisorPage() {
     );
 }
 
-// ---- HistoricoSection: filtros + paginação + CSV ----
+// ---- HistoricoSection: apenas paginação ----
 const ITENS_POR_PAGINA = 10;
 
-const LABEL_STATUS: Record<string, string> = {
-    pedido_em_andamento: 'Em andamento',
-    sem_estoque: 'Sem estoque',
-    liberado_retirada: 'Liberado p/ retirada',
-    pendente: 'Em andamento',
-    aprovada: 'Liberado p/ retirada',
-    rejeitada: 'Sem estoque',
-    concluida: 'Em andamento',
-};
-
-function exportarCSV(dados: any[]) {
-    const cabecalho = ['ID', 'Técnico', 'Matrícula Técnico', 'Supervisor', 'Item Saída', 'Motivo', 'Status', 'Data'];
-    const linhas = dados.map((s) => [
-        s.id.split('-')[0].toUpperCase(),
-        s.tecnicoNome,
-        s.tecnicoMatricula,
-        s.supervisorNome ?? '',
-        s.itemSaidaNome,
-        s.motivo ?? '',
-        LABEL_STATUS[s.status] ?? s.status,
-        new Date(s.dataSolicitacao).toLocaleDateString('pt-BR'),
-    ]);
-    const conteudo = [cabecalho, ...linhas].map((r) => r.map((v: string) => `"${String(v).replace(/"/g, '""')}"`).join(',')).join('\n');
-    const blob = new Blob(['\uFEFF' + conteudo], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `historico_trocas_${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-}
-
 function HistoricoSection({ dados, loading, onNovaSolicitacao }: { dados: any[]; loading: boolean; onNovaSolicitacao: () => void }) {
-    const [busca, setBusca] = useState('');
-    const [filtroStatus, setFiltroStatus] = useState('');
-    const [filtroData, setFiltroData] = useState('');
     const [pagina, setPagina] = useState(1);
-
-    const filtrados = useMemo(() => {
-        const q = busca.toLowerCase().trim();
-        return dados.filter((s) => {
-            const matchBusca = !q || s.tecnicoNome?.toLowerCase().includes(q) || s.tecnicoMatricula?.toLowerCase().includes(q) || s.id.toLowerCase().includes(q);
-            const matchStatus = !filtroStatus || s.status === filtroStatus;
-            const matchData = !filtroData || s.dataSolicitacao?.startsWith(filtroData);
-            return matchBusca && matchStatus && matchData;
-        });
-    }, [dados, busca, filtroStatus, filtroData]);
-
-    // Resetar página ao mudar filtro
-    const totalPaginas = Math.max(1, Math.ceil(filtrados.length / ITENS_POR_PAGINA));
+    const totalPaginas = Math.max(1, Math.ceil(dados.length / ITENS_POR_PAGINA));
     const paginaAtual = Math.min(pagina, totalPaginas);
-    const paginados = filtrados.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA);
-
-    function limparFiltros() { setBusca(''); setFiltroStatus(''); setFiltroData(''); setPagina(1); }
+    const paginados = dados.slice((paginaAtual - 1) * ITENS_POR_PAGINA, paginaAtual * ITENS_POR_PAGINA);
 
     if (loading) return (
         <div className="bg-white border border-slate-200 rounded-3xl p-16 text-center">
@@ -654,78 +605,19 @@ function HistoricoSection({ dados, loading, onNovaSolicitacao }: { dados: any[];
 
     return (
         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Cabeçalho com filtros */}
-            <div className="flex flex-col gap-4 mb-6">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                    <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Solicitações Registradas</h2>
-                    <div className="flex items-center gap-2">
-                        <span className="bg-slate-200/50 text-slate-600 text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-wider">
-                            {filtrados.length} de {dados.length}
-                        </span>
-                        <button
-                            onClick={() => exportarCSV(filtrados)}
-                            disabled={filtrados.length === 0}
-                            title="Exportar CSV"
-                            className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-2 rounded-xl border-2 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-all disabled:opacity-40"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                            </svg>
-                            Exportar CSV
-                        </button>
-                    </div>
-                </div>
-
-                {/* Barra de filtros */}
-                <div className="flex flex-col sm:flex-row gap-2">
-                    <div className="relative grow">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z" />
-                        </svg>
-                        <input
-                            type="text"
-                            value={busca}
-                            onChange={(e) => { setBusca(e.target.value); setPagina(1); }}
-                            placeholder="Buscar por técnico ou ID..."
-                            className="w-full pl-9 pr-3 py-2.5 text-xs font-bold border-2 border-slate-100 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-slate-300 transition-all"
-                        />
-                    </div>
-                    <select
-                        value={filtroStatus}
-                        onChange={(e) => { setFiltroStatus(e.target.value); setPagina(1); }}
-                        className="px-3 py-2.5 text-[11px] font-black uppercase tracking-wider border-2 border-slate-100 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-slate-300 transition-all cursor-pointer"
-                    >
-                        <option value="">Todos os status</option>
-                        <option value="pedido_em_andamento">🔵 Em andamento</option>
-                        <option value="sem_estoque">🔴 Sem estoque</option>
-                        <option value="liberado_retirada">🟢 Liberado p/ retirada</option>
-                    </select>
-                    <input
-                        type="date"
-                        value={filtroData}
-                        onChange={(e) => { setFiltroData(e.target.value); setPagina(1); }}
-                        className="px-3 py-2.5 text-[11px] font-black border-2 border-slate-100 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-slate-300 transition-all"
-                    />
-                    {(busca || filtroStatus || filtroData) && (
-                        <button onClick={limparFiltros} className="text-[10px] font-black uppercase tracking-wider px-3 py-2 rounded-xl border-2 border-slate-200 text-slate-500 hover:bg-slate-50 transition-all whitespace-nowrap">
-                            Limpar
-                        </button>
-                    )}
-                </div>
+            <div className="flex items-center justify-between mb-6">
+                <h2 className="text-xl font-black text-slate-900 uppercase tracking-tight">Solicitações Registradas</h2>
+                <span className="bg-slate-200/50 text-slate-600 text-[10px] font-black px-3 py-1.5 rounded-full uppercase tracking-wider">
+                    Total: {dados.length}
+                </span>
             </div>
 
-            {filtrados.length === 0 ? (
+            {dados.length === 0 ? (
                 <div className="bg-white border-2 border-dashed border-slate-200 rounded-3xl p-16 text-center">
-                    <p className="text-slate-400 font-black uppercase tracking-widest text-sm mb-3">Nenhum resultado encontrado</p>
-                    {dados.length === 0 ? (
-                        <button onClick={onNovaSolicitacao} className="bg-black text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all">
-                            Criar Primeira Solicitação
-                        </button>
-                    ) : (
-                        <button onClick={limparFiltros} className="text-[10px] font-black uppercase tracking-wider px-4 py-2 rounded-xl border-2 border-slate-200 text-slate-500 hover:bg-slate-50 transition-all">
-                            Limpar filtros
-                        </button>
-                    )}
+                    <p className="text-slate-400 font-black uppercase tracking-widest text-sm mb-4">Nenhuma solicitação encontrada</p>
+                    <button onClick={onNovaSolicitacao} className="bg-black text-white px-8 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg shadow-black/10">
+                        Criar Primeira Solicitação
+                    </button>
                 </div>
             ) : (
                 <div className="bg-white border border-slate-200 rounded-3xl overflow-hidden shadow-xl shadow-slate-200/40">
@@ -793,48 +685,29 @@ function HistoricoSection({ dados, loading, onNovaSolicitacao }: { dados: any[];
                     {totalPaginas > 1 && (
                         <div className="flex items-center justify-between px-6 py-4 border-t border-slate-100 bg-slate-50/30">
                             <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
-                                Pág. {paginaAtual} de {totalPaginas} · {filtrados.length} registros
+                                Pág. {paginaAtual} de {totalPaginas} · {dados.length} registros
                             </span>
                             <div className="flex items-center gap-1">
-                                <button
-                                    onClick={() => setPagina(1)}
-                                    disabled={paginaAtual === 1}
-                                    className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all"
-                                >
+                                <button onClick={() => setPagina(1)} disabled={paginaAtual === 1} className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" /></svg>
                                 </button>
-                                <button
-                                    onClick={() => setPagina((p) => Math.max(1, p - 1))}
-                                    disabled={paginaAtual === 1}
-                                    className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all"
-                                >
+                                <button onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={paginaAtual === 1} className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
                                 </button>
                                 {Array.from({ length: Math.min(5, totalPaginas) }, (_, i) => {
                                     const inicio = Math.max(1, Math.min(paginaAtual - 2, totalPaginas - 4));
                                     const num = inicio + i;
                                     return num <= totalPaginas ? (
-                                        <button
-                                            key={num}
-                                            onClick={() => setPagina(num)}
-                                            className={`w-8 h-8 rounded-lg text-[11px] font-black transition-all ${num === paginaAtual ? 'bg-black text-white' : 'text-slate-500 hover:bg-slate-100'}`}
-                                        >
+                                        <button key={num} onClick={() => setPagina(num)}
+                                            className={`w-8 h-8 rounded-lg text-[11px] font-black transition-all ${num === paginaAtual ? 'bg-black text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
                                             {num}
                                         </button>
                                     ) : null;
                                 })}
-                                <button
-                                    onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))}
-                                    disabled={paginaAtual === totalPaginas}
-                                    className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all"
-                                >
+                                <button onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={paginaAtual === totalPaginas} className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
                                 </button>
-                                <button
-                                    onClick={() => setPagina(totalPaginas)}
-                                    disabled={paginaAtual === totalPaginas}
-                                    className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all"
-                                >
+                                <button onClick={() => setPagina(totalPaginas)} disabled={paginaAtual === totalPaginas} className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all">
                                     <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M6 5l7 7-7 7" /></svg>
                                 </button>
                             </div>

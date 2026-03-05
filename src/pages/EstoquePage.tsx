@@ -3,7 +3,7 @@
 // Dados em tempo real via Supabase
 // ============================================================
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { supabase } from '../lib/supabase';
 
@@ -334,7 +334,37 @@ export default function EstoquePage() {
     );
 }
 
-// ---- Componente de lista ----
+const ITENS_POR_PAGINA_EST = 10;
+
+const LABEL_STATUS_EST: Record<string, string> = {
+    pedido_em_andamento: 'Em andamento',
+    sem_estoque: 'Sem estoque',
+    liberado_retirada: 'Liberado p/ retirada',
+};
+
+function exportarCSVEstoque(dados: Troca[]) {
+    const cab = ['ID', 'Supervisor', 'Técnico', 'Matrícula Técnico', 'Item Devolução', 'Motivo', 'Status', 'Data'];
+    const linhas = dados.map((t) => [
+        t.id.split('-')[0].toUpperCase(),
+        t.supervisor_nome,
+        t.tecnico_nome,
+        t.tecnico_matricula,
+        t.item_saida_nome,
+        t.motivo,
+        LABEL_STATUS_EST[t.status] ?? t.status,
+        new Date(t.data_troca).toLocaleDateString('pt-BR'),
+    ]);
+    const conteudo = [cab, ...linhas].map((r) => r.map((v) => `"${String(v ?? '').replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob(['\uFEFF' + conteudo], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `pedidos_estoque_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+// ---- Componente de lista com filtros, paginacao e CSV ----
 function TrocasList({
     trocas,
     tabAtiva,
@@ -346,35 +376,138 @@ function TrocasList({
     atualizando: string | null;
     onAtualizarStatus: (id: string, status: StatusEstoque) => void;
 }) {
+    const [busca, setBusca] = useState('');
+    const [filtroData, setFiltroData] = useState('');
+    const [pagina, setPagina] = useState(1);
+
+    // Resetar página ao mudar aba ou filtros
+    React.useEffect(() => { setPagina(1); }, [tabAtiva, busca, filtroData]);
+
+    const filtrados = useMemo(() => {
+        const q = busca.toLowerCase().trim();
+        return trocas.filter((t) => {
+            const matchBusca = !q ||
+                t.tecnico_nome?.toLowerCase().includes(q) ||
+                t.tecnico_matricula?.toLowerCase().includes(q) ||
+                t.supervisor_nome?.toLowerCase().includes(q) ||
+                t.id.toLowerCase().includes(q);
+            const matchData = !filtroData || t.data_troca?.startsWith(filtroData);
+            return matchBusca && matchData;
+        });
+    }, [trocas, busca, filtroData]);
+
+    const totalPaginas = Math.max(1, Math.ceil(filtrados.length / ITENS_POR_PAGINA_EST));
+    const paginaAtual = Math.min(pagina, totalPaginas);
+    const paginados = filtrados.slice((paginaAtual - 1) * ITENS_POR_PAGINA_EST, paginaAtual * ITENS_POR_PAGINA_EST);
+
     const emptyMessages: Record<typeof tabAtiva, { title: string; subtitle: string }> = {
         fila: { title: 'Nenhum pedido em andamento', subtitle: 'Novas solicitações dos supervisores aparecerão aqui.' },
         liberados: { title: 'Nenhum pedido liberado', subtitle: 'Pedidos liberados para retirada aparecerão aqui.' },
         sem_estoque: { title: 'Sem registros de falta', subtitle: 'Pedidos sem estoque disponível aparecerão aqui.' },
     };
 
-    if (trocas.length === 0) {
-        const msg = emptyMessages[tabAtiva];
-        return (
-            <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
-                <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4 text-slate-300">
-                    <IconInbox />
-                </div>
-                <p className="text-sm font-black text-slate-500 uppercase tracking-widest">{msg.title}</p>
-                <p className="text-xs text-slate-400 mt-2">{msg.subtitle}</p>
-            </div>
-        );
-    }
-
     return (
-        <div className="space-y-3">
-            {trocas.map((troca) => (
-                <TrocaCard
-                    key={troca.id}
-                    troca={troca}
-                    atualizando={atualizando === troca.id}
-                    onAtualizarStatus={onAtualizarStatus}
+        <div className="space-y-4">
+            {/* Barra busca + data + CSV */}
+            <div className="flex flex-col sm:flex-row gap-2">
+                <div className="relative grow">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M21 21l-4.35-4.35M17 11A6 6 0 105 11a6 6 0 0012 0z" />
+                    </svg>
+                    <input
+                        type="text"
+                        value={busca}
+                        onChange={(e) => setBusca(e.target.value)}
+                        placeholder="Buscar por técnico, supervisor ou ID..."
+                        className="w-full pl-9 pr-3 py-2.5 text-xs font-bold border-2 border-slate-100 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-slate-300 transition-all"
+                    />
+                </div>
+                <input
+                    type="date"
+                    value={filtroData}
+                    onChange={(e) => setFiltroData(e.target.value)}
+                    className="px-3 py-2.5 text-[11px] font-black border-2 border-slate-100 rounded-xl bg-white text-slate-700 focus:outline-none focus:border-slate-300 transition-all"
                 />
-            ))}
+                {(busca || filtroData) && (
+                    <button onClick={() => { setBusca(''); setFiltroData(''); }} className="text-[10px] font-black uppercase tracking-wider px-3 py-2 rounded-xl border-2 border-slate-200 text-slate-500 hover:bg-slate-50 transition-all whitespace-nowrap">
+                        Limpar
+                    </button>
+                )}
+                <button
+                    onClick={() => exportarCSVEstoque(filtrados)}
+                    disabled={filtrados.length === 0}
+                    title="Exportar CSV"
+                    className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wider px-3 py-2.5 rounded-xl border-2 border-emerald-200 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-all disabled:opacity-40 whitespace-nowrap"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                    CSV ({filtrados.length})
+                </button>
+            </div>
+
+            {/* Lista */}
+            {filtrados.length === 0 ? (
+                <div className="bg-white border-2 border-dashed border-slate-200 rounded-2xl p-16 text-center">
+                    <div className="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center mx-auto mb-4 text-slate-300"><IconInbox /></div>
+                    <p className="text-sm font-black text-slate-500 uppercase tracking-widest">
+                        {trocas.length === 0 ? emptyMessages[tabAtiva].title : 'Nenhum resultado encontrado'}
+                    </p>
+                    <p className="text-xs text-slate-400 mt-2">
+                        {trocas.length === 0 ? emptyMessages[tabAtiva].subtitle : 'Tente outros termos de busca.'}
+                    </p>
+                </div>
+            ) : (
+                <>
+                    <div className="space-y-3">
+                        {paginados.map((troca) => (
+                            <TrocaCard
+                                key={troca.id}
+                                troca={troca}
+                                atualizando={atualizando === troca.id}
+                                onAtualizarStatus={onAtualizarStatus}
+                            />
+                        ))}
+                    </div>
+
+                    {/* Paginacao */}
+                    {totalPaginas > 1 && (
+                        <div className="flex items-center justify-between bg-white border border-slate-200 rounded-2xl px-5 py-3">
+                            <span className="text-[10px] font-black text-slate-400 uppercase tracking-wider">
+                                Pág. {paginaAtual} de {totalPaginas} · {filtrados.length} pedidos
+                            </span>
+                            <div className="flex items-center gap-1">
+                                <button onClick={() => setPagina(1)} disabled={paginaAtual === 1}
+                                    className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M11 19l-7-7 7-7M18 19l-7-7 7-7" /></svg>
+                                </button>
+                                <button onClick={() => setPagina((p) => Math.max(1, p - 1))} disabled={paginaAtual === 1}
+                                    className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+                                </button>
+                                {Array.from({ length: Math.min(5, totalPaginas) }, (_, i) => {
+                                    const inicio = Math.max(1, Math.min(paginaAtual - 2, totalPaginas - 4));
+                                    const num = inicio + i;
+                                    return num <= totalPaginas ? (
+                                        <button key={num} onClick={() => setPagina(num)}
+                                            className={`w-8 h-8 rounded-lg text-[11px] font-black transition-all ${num === paginaAtual ? 'bg-black text-white' : 'text-slate-500 hover:bg-slate-100'}`}>
+                                            {num}
+                                        </button>
+                                    ) : null;
+                                })}
+                                <button onClick={() => setPagina((p) => Math.min(totalPaginas, p + 1))} disabled={paginaAtual === totalPaginas}
+                                    className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" /></svg>
+                                </button>
+                                <button onClick={() => setPagina(totalPaginas)} disabled={paginaAtual === totalPaginas}
+                                    className="p-2 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-30 transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M13 5l7 7-7 7M6 5l7 7-7 7" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                    )}
+                </>
+            )}
         </div>
     );
 }
