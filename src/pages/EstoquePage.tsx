@@ -24,6 +24,9 @@ interface Troca {
     prazo_expirado: boolean;
     atendido_por: string | null;
     data_atendimento: string | null;
+    valor?: number;
+    tecnico_cargo?: string;
+    tecnico_setor?: string;
 }
 
 const LIMITE_RETIRADA_MS = 24 * 60 * 60 * 1000;
@@ -341,6 +344,8 @@ function TrocasList({
                 'Matrícula Supervisor': t.supervisor_matricula,
                 'Técnico': t.tecnico_nome,
                 'Matrícula Técnico': t.tecnico_matricula,
+                'Cargo Técnico': t.tecnico_cargo || '',
+                'Setor Técnico': t.tecnico_setor || '',
                 'Item Saída (Devolução)': t.item_saida_nome,
                 'Item Entrada (Substituição)': t.item_entrada_nome,
                 'Motivo': t.motivo,
@@ -352,6 +357,7 @@ function TrocasList({
                 'Data Atendimento': t.data_atendimento ? new Date(t.data_atendimento).toLocaleDateString('pt-BR') : '',
                 'Hora Atendimento': t.data_atendimento ? new Date(t.data_atendimento).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
                 'SLA (Tempo de Atendimento)': sla,
+                'Valor (R$)': t.valor || 0,
             };
         });
         const ws = XLSX.utils.json_to_sheet(linhas);

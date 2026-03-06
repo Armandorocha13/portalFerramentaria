@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase';
 vi.mock('../lib/supabase', () => ({
     supabase: {
         from: vi.fn(),
+        rpc: vi.fn()
     },
 }));
 
@@ -30,12 +31,8 @@ describe('AuthContext - Segurança e Login', () => {
     });
 
     it('deve bloquear após 5 tentativas inválidas e liberar após 5 minutos', async () => {
-        // Configuramos o mock para SEMPRE falhar (sem dados)
-        const mockSingle = vi.fn().mockResolvedValue({ data: null, error: null });
-        const mockEq = vi.fn().mockReturnValue({ single: mockSingle, eq: vi.fn().mockReturnThis() });
-        const mockSelect = vi.fn().mockReturnValue({ eq: mockEq });
-        const mockFrom = vi.fn().mockReturnValue({ select: mockSelect });
-        (supabase.from as any) = mockFrom;
+        // Configuramos o mock do RPC para SEMPRE retornar array vazio (falha no login)
+        (supabase.rpc as any).mockResolvedValue({ data: [], error: null });
 
         const { result } = renderHook(() => useAuth(), { wrapper: AuthProvider });
 

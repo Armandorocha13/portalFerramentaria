@@ -155,6 +155,7 @@ export async function getCargaTecnico(tecnicoMatricula: string): Promise<ItemCar
         quantidade: parseInt(item.saldo) || 0,
         dataAtribuicao: item.created_at,
         patrimonio: '', // O campo patrimonio não veio no CSV básico
+        valor: item.valor || 0,
     }));
 }
 
@@ -197,16 +198,16 @@ export async function registrarTroca(dados: {
     // Pegar informações do técnico
     const { data: tecnico } = await supabase
         .from('tecnicos')
-        .select('id, nome')
+        .select('id, nome, cargo, setor')
         .eq('matricula', dados.tecnico_matricula.toUpperCase())
         .single();
 
     if (!tecnico) throw new Error('Técnico não encontrado.');
 
-    // Pegar nome do material de saída
+    // Pegar nome e valor do material de saída
     const { data: itemSaida } = await supabase
         .from('carga_tecnicos')
-        .select('descricao_material')
+        .select('descricao_material, valor')
         .eq('id', dados.item_saida_id)
         .single();
 
@@ -220,9 +221,12 @@ export async function registrarTroca(dados: {
             tecnico_id: tecnico.id,
             tecnico_matricula: dados.tecnico_matricula,
             tecnico_nome: tecnico.nome,
+            tecnico_cargo: tecnico.cargo,
+            tecnico_setor: tecnico.setor,
             item_saida_nome: itemSaida?.descricao_material || 'Item Desconhecido',
             item_entrada_nome: dados.material_entrada_nome,
             motivo: dados.motivo,
+            valor: itemSaida?.valor || 0,
             status: 'pedido_em_andamento', // Estado inicial — estoque irá atualizar
         })
         .select()

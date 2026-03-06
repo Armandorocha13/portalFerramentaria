@@ -36,6 +36,7 @@ export interface ItemCarga {
     quantidade: number;
     dataAtribuicao: string;
     patrimonio?: string;
+    valor?: number;
 }
 
 /** Material disponível no catálogo */
