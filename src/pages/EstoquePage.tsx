@@ -119,6 +119,32 @@ function PrazoRetirada({ dataLiberacao }: { dataLiberacao: string }) {
     );
 }
 
+// ---- Contador de dias corridos ----
+function TimeAgoLabel({ status, dataTroca, dataAtendimento }: { status: StatusEstoque; dataTroca: string; dataAtendimento: string | null }) {
+    const calcularDias = (data: string) => {
+        const agora = new Date();
+        const ref = new Date(data);
+        // Resetar horas para comparar apenas dias
+        const d1 = Date.UTC(agora.getFullYear(), agora.getMonth(), agora.getDate());
+        const d2 = Date.UTC(ref.getFullYear(), ref.getMonth(), ref.getDate());
+        return Math.floor(Math.abs(d1 - d2) / (1000 * 60 * 60 * 24));
+    };
+
+    const dias = status === 'retirado' && dataAtendimento
+        ? calcularDias(dataAtendimento)
+        : calcularDias(dataTroca);
+
+    if (dias === 0) return null;
+
+    const texto = status === 'retirado' ? 'Finalizado há' : 'Aberto há';
+
+    return (
+        <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap">
+            · {texto} {dias} {dias === 1 ? 'dia' : 'dias'}
+        </span>
+    );
+}
+
 // ---- Card de cada troca ----
 function TrocaCard({
     troca,
@@ -166,7 +192,14 @@ function TrocaCard({
                         </span>
                     )}
                 </div>
-                <span className="text-xs text-gray-400 shrink-0 hidden sm:block">{dataFormatada}</span>
+                <div className="flex flex-col items-end gap-0.5 shrink-0 hidden sm:flex">
+                    <span className="text-xs text-gray-400">{dataFormatada}</span>
+                    <TimeAgoLabel
+                        status={troca.status}
+                        dataTroca={troca.data_troca}
+                        dataAtendimento={troca.data_atendimento}
+                    />
+                </div>
             </div>
 
             {/* Informações */}

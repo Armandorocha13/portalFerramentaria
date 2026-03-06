@@ -73,6 +73,28 @@ function PrazoRetirada({ dataLiberacao }: { dataLiberacao: string }) {
     );
 }
 
+// ---- Contador de dias corridos ----
+function TimeAgoLabel({ status, dataSolicitacao }: { status: string; dataSolicitacao: string }) {
+    const calcularDias = (data: string) => {
+        const agora = new Date();
+        const ref = new Date(data);
+        const d1 = Date.UTC(agora.getFullYear(), agora.getMonth(), agora.getDate());
+        const d2 = Date.UTC(ref.getFullYear(), ref.getMonth(), ref.getDate());
+        return Math.floor(Math.abs(d1 - d2) / (1000 * 60 * 60 * 24));
+    };
+
+    const dias = calcularDias(dataSolicitacao);
+    if (dias === 0) return null;
+
+    const texto = status === 'retirado' ? 'Finalizado há' : 'Aberto há';
+
+    return (
+        <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap mt-1">
+            {texto} {dias} {dias === 1 ? 'dia' : 'dias'}
+        </span>
+    );
+}
+
 export default function SupervisorPage() {
     const { usuario, logout } = useAuth();
     const { adicionarSolicitacao } = useSolicitacoes();
@@ -682,6 +704,7 @@ function HistoricoSection({
                                         </td>
                                         <td className="px-5 py-4">
                                             <p className="text-sm text-gray-600">{new Date(sol.dataSolicitacao).toLocaleDateString('pt-BR')}</p>
+                                            <TimeAgoLabel status={sol.status} dataSolicitacao={sol.dataSolicitacao} />
                                         </td>
                                         <td className="px-5 py-4">
                                             <div className="flex flex-col gap-1">
@@ -718,7 +741,10 @@ function HistoricoSection({
                                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Material</p>
                                     <p className="text-sm text-gray-700">{sol.itemSaidaNome}</p>
                                 </div>
-                                <p className="text-xs text-gray-400">{new Date(sol.dataSolicitacao).toLocaleDateString('pt-BR')}</p>
+                                <div className="flex items-center justify-between">
+                                    <p className="text-xs text-gray-400">{new Date(sol.dataSolicitacao).toLocaleDateString('pt-BR')}</p>
+                                    <TimeAgoLabel status={sol.status} dataSolicitacao={sol.dataSolicitacao} />
+                                </div>
                             </div>
                         ))}
                     </div>
