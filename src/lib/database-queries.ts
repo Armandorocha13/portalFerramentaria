@@ -138,6 +138,14 @@ export async function getTecnico(matricula: string, supervisorId: string): Promi
     };
 }
 
+// Auxiliar para converter valores monetários (ex: "2,00" -> 2.0)
+const sanitizarValor = (val: any): number => {
+    if (!val) return 0;
+    if (typeof val === 'number') return val;
+    const str = String(val).replace(',', '.').replace(/[^\d.]/g, '');
+    return parseFloat(str) || 0;
+};
+
 /** 🛠️ Recupera a carga/saldo do técnico */
 export async function getCargaTecnico(tecnicoMatricula: string): Promise<ItemCarga[]> {
     const { data, error } = await supabase
@@ -155,7 +163,7 @@ export async function getCargaTecnico(tecnicoMatricula: string): Promise<ItemCar
         quantidade: parseInt(item.saldo) || 0,
         dataAtribuicao: item.created_at,
         patrimonio: '', // O campo patrimonio não veio no CSV básico
-        valor: item.valor_total || 0,
+        valor: sanitizarValor(item.valor_total),
     }));
 }
 
@@ -226,7 +234,7 @@ export async function registrarTroca(dados: {
             item_saida_nome: itemSaida?.descricao_material || 'Item Desconhecido',
             item_entrada_nome: dados.material_entrada_nome,
             motivo: dados.motivo,
-            valor: itemSaida?.valor_total || 0,
+            valor: sanitizarValor(itemSaida?.valor_total),
             status: 'pedido_em_andamento', // Estado inicial — estoque irá atualizar
         })
         .select()
