@@ -84,13 +84,12 @@ function TimeAgoLabel({ status, dataSolicitacao }: { status: string; dataSolicit
     };
 
     const dias = calcularDias(dataSolicitacao);
-    if (dias === 0) return null;
-
-    const texto = status === 'retirado' ? 'Atendimento finalizado há' : 'Pedido aberto há';
+    const texto = status === 'retirado' ? 'Atendimento finalizado' : 'Pedido aberto';
+    const tempo = dias === 0 ? 'hoje' : `há ${dias} ${dias === 1 ? 'dia' : 'dias'}`;
 
     return (
         <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap mt-1">
-            {texto} {dias} {dias === 1 ? 'dia' : 'dias'}
+            {texto} {tempo}
         </span>
     );
 }
