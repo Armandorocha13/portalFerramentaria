@@ -361,12 +361,16 @@ function TrocasList({
         const linhas = dados.map((t) => {
             // Calcular SLA em horas (se atendido)
             let sla = '';
+            let diasParaFinalizar = '';
             if (t.data_atendimento && t.data_troca) {
                 const diffMs = new Date(t.data_atendimento).getTime() - new Date(t.data_troca).getTime();
-                if (diffMs > 0) {
+                if (diffMs >= 0) {
                     const h = Math.floor(diffMs / 3_600_000);
                     const m = Math.floor((diffMs % 3_600_000) / 60_000);
                     sla = `${h}h ${m}min`;
+
+                    const d = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                    diasParaFinalizar = d === 0 ? 'Mesmo dia' : `${d} dia(s)`;
                 }
             }
             return {
@@ -388,7 +392,8 @@ function TrocasList({
                 'Atendido por': t.atendido_por || '',
                 'Data Atendimento': t.data_atendimento ? new Date(t.data_atendimento).toLocaleDateString('pt-BR') : '',
                 'Hora Atendimento': t.data_atendimento ? new Date(t.data_atendimento).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
-                'SLA (Tempo de Atendimento)': sla,
+                'SLA (Detalhado)': sla,
+                'SLA (Dias)': diasParaFinalizar,
                 'Valor (R$)': t.valor || 0,
             };
         });
