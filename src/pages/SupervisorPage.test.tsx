@@ -21,13 +21,15 @@ vi.mock('../context/SolicitacoesContext', () => ({
 const mockGetTecnico = vi.hoisted(() => vi.fn());
 const mockGetCargaTecnico = vi.hoisted(() => vi.fn());
 const mockRegistrarTroca = vi.hoisted(() => vi.fn());
-const mockGetHistoricoTrocas = vi.hoisted(() => vi.fn().mockResolvedValue([]));
+const mockGetHistoricoTrocas = vi.hoisted(() => vi.fn().mockResolvedValue({ data: [], count: 0 }));
+const mockVerificarTrocasRecentesBatch = vi.hoisted(() => vi.fn().mockResolvedValue(new Map()));
 
 vi.mock('../lib/database-queries', () => ({
     getTecnico: mockGetTecnico,
     getCargaTecnico: mockGetCargaTecnico,
     registrarTroca: mockRegistrarTroca,
     getHistoricoTrocas: mockGetHistoricoTrocas,
+    verificarTrocasRecentesBatch: mockVerificarTrocasRecentesBatch,
 }));
 
 // 3. Mock do Supabase Client para contornar problemas de realtime WebSocket

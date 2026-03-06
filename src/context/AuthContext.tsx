@@ -76,47 +76,44 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         try {
             // 1️⃣ Verifica usuarios_estoque PRIMEIRO
-            const { data: estoque } = await supabase
-                .from('usuarios_estoque')
-                .select('id, matricula, nome, cargo, ativo')
-                .eq('matricula', mat)
-                .eq('senha', senha)
-                .eq('ativo', true)
-                .single();
+            const { data: estoque } = await supabase.rpc('login_estoque', {
+                p_matricula: mat,
+                p_senha: senha
+            });
 
-            if (estoque) {
+            if (estoque && estoque.length > 0) {
+                const user = estoque[0];
                 tentativas.current = 0;
                 bloqueadoAte.current = null;
                 setUsuario({
-                    id: estoque.id,
-                    matricula: estoque.matricula,
-                    nome: estoque.nome,
+                    id: user.id || '',
+                    matricula: user.matricula || '',
+                    nome: user.nome || '',
                     senha: '',
-                    setor: estoque.cargo,
-                    perfil: 'estoque',
+                    setor: user.cargo || '',
+                    perfil: 'estoque' as const,
                 });
                 agendarExpiracaoSessao();
                 return { success: true };
             }
 
             // 2️⃣ Verifica supervisores
-            const { data: supervisor } = await supabase
-                .from('supervisores')
-                .select('id, matricula, nome, setor')
-                .eq('matricula', mat)
-                .eq('senha', senha)
-                .single();
+            const { data: supervisor } = await supabase.rpc('login_supervisor', {
+                p_matricula: mat,
+                p_senha: senha
+            });
 
-            if (supervisor) {
+            if (supervisor && supervisor.length > 0) {
+                const user = supervisor[0];
                 tentativas.current = 0;
                 bloqueadoAte.current = null;
                 setUsuario({
-                    id: supervisor.id,
-                    matricula: supervisor.matricula,
-                    nome: supervisor.nome,
+                    id: user.id || '',
+                    matricula: user.matricula || '',
+                    nome: user.nome || '',
                     senha: '',
-                    setor: supervisor.setor || 'Geral',
-                    perfil: 'supervisor',
+                    setor: user.setor || 'Geral',
+                    perfil: 'supervisor' as const,
                 });
                 agendarExpiracaoSessao();
                 return { success: true };

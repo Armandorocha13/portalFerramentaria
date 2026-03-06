@@ -6,7 +6,7 @@
 import { useState, useEffect, useCallback, type FormEvent } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useSolicitacoes } from '../context/SolicitacoesContext';
-import { getTecnico, getCargaTecnico, registrarTroca, getHistoricoTrocas } from '../lib/database-queries';
+import { getTecnico, getCargaTecnico, registrarTroca, getHistoricoTrocas, verificarTrocasRecentesBatch, type ResultadoTrocaRecente } from '../lib/database-queries';
 import { supabase } from '../lib/supabase';
 import { calcularPrazoD1 } from '../mocks/database';
 import type { ItemCarga, FormularioTroca } from '../types';
@@ -24,11 +24,11 @@ const INITIAL_FORM: FormularioTroca = {
 // ---- Badge de Status ----
 function StatusBadge({ status }: { status: string }) {
     const config: Record<string, { label: string; cls: string; dot: string }> = {
-        pedido_em_andamento: { label: 'Em andamento', cls: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500 animate-pulse' },
+        pedido_em_andamento: { label: 'Em andamento', cls: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500' },
         sem_estoque: { label: 'Sem estoque', cls: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500' },
         liberado_retirada: { label: 'Liberado p/ retirada', cls: 'bg-green-50 text-green-700 border-green-200', dot: 'bg-green-500' },
         retirado: { label: 'Finalizado', cls: 'bg-gray-100 text-gray-500 border-gray-200', dot: 'bg-gray-400' },
-        pendente: { label: 'Em andamento', cls: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500 animate-pulse' },
+        pendente: { label: 'Em andamento', cls: 'bg-blue-50 text-blue-700 border-blue-200', dot: 'bg-blue-500' },
         aprovada: { label: 'Liberado p/ retirada', cls: 'bg-green-50 text-green-700 border-green-200', dot: 'bg-green-500' },
         rejeitada: { label: 'Sem estoque', cls: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500' },
         concluida: { label: 'Finalizado', cls: 'bg-gray-100 text-gray-500 border-gray-200', dot: 'bg-gray-400' },
@@ -90,6 +90,10 @@ export default function SupervisorPage() {
     const [historicoPagina, setHistoricoPagina] = useState(1);
     const [notificacao, setNotificacao] = useState<{ id: string; texto: string } | null>(null);
 
+    // ── Trava de 45 dias ──
+    const [trocasRecentes, setTrocasRecentes] = useState<Map<string, ResultadoTrocaRecente>>(new Map());
+    const [itemBloqueadoAlerta, setItemBloqueadoAlerta] = useState<ResultadoTrocaRecente | null>(null);
+
     const fetchHistorico = useCallback(async (page = historicoPagina) => {
         if (!usuario?.id) return;
         setLoading(true);
@@ -150,6 +154,9 @@ export default function SupervisorPage() {
             }
             const carga = await getCargaTecnico(tecnico.matricula);
             setCargaTecnico(carga);
+            // Carregar trocas recentes (< 45 dias) para badges
+            const recentes = await verificarTrocasRecentesBatch(tecnico.matricula);
+            setTrocasRecentes(recentes);
             setForm((prev) => ({ ...prev, tecnicoValidado: tecnico }));
             setStep(1);
         } catch (err: any) {
@@ -160,6 +167,19 @@ export default function SupervisorPage() {
     }
 
     function handleSelecionarItemSaida(item: ItemCarga) {
+        // ── Verificar trava de 45 dias ──
+        const bloqueio = trocasRecentes.get(item.materialNome);
+        if (bloqueio && bloqueio.bloqueado) {
+            setItemBloqueadoAlerta(bloqueio);
+            setForm((prev) => ({
+                ...prev,
+                itemSaidaSelecionado: item,
+                materialEntradaSelecionado: null,
+            }));
+            // NÃO avança para o próximo step
+            return;
+        }
+        setItemBloqueadoAlerta(null);
         setForm((prev) => ({
             ...prev,
             itemSaidaSelecionado: item,
@@ -218,6 +238,7 @@ export default function SupervisorPage() {
 
     function handleVoltar() {
         setErro('');
+        setItemBloqueadoAlerta(null);
         if (step === 1) setForm((prev) => ({ ...prev, tecnicoValidado: null }));
         if (step === 3) setForm((prev) => ({ ...prev, itemSaidaSelecionado: null, materialEntradaSelecionado: null }));
         setStep((prev) => Math.max(0, prev - 1));
@@ -226,6 +247,10 @@ export default function SupervisorPage() {
     // ---- RENDER ----
     return (
         <div className="min-h-screen bg-gray-50">
+            <style>{`
+                .no-scrollbar::-webkit-scrollbar { display: none; }
+                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
             {/* Header */}
             <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
                 <div className="max-w-4xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
@@ -268,11 +293,11 @@ export default function SupervisorPage() {
                 )}
 
                 {/* Tabs */}
-                <div className="flex gap-1 mb-6 border-b border-gray-200">
+                <div className="flex gap-1 mb-6 border-b border-gray-200 overflow-x-auto no-scrollbar scroll-smooth">
                     <button
                         id="tab-nova"
                         onClick={() => setTabAtiva('nova')}
-                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${tabAtiva === 'nova'
+                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap shrink-0 ${tabAtiva === 'nova'
                             ? 'border-gray-800 text-gray-800'
                             : 'border-transparent text-gray-400 hover:text-gray-600'
                             }`}
@@ -282,14 +307,14 @@ export default function SupervisorPage() {
                     <button
                         id="tab-historico"
                         onClick={() => setTabAtiva('historico')}
-                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px flex items-center gap-2 ${tabAtiva === 'historico'
+                        className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap shrink-0 flex items-center gap-2 ${tabAtiva === 'historico'
                             ? 'border-gray-800 text-gray-800'
                             : 'border-transparent text-gray-400 hover:text-gray-600'
                             }`}
                     >
                         Acompanhamento
                         {historicoSupabase.length > 0 && (
-                            <span className="bg-gray-800 text-white text-[10px] rounded-full px-1.5 py-0.5">{historicoSupabase.length}</span>
+                            <span className={`text-[10px] rounded-full px-1.5 py-0.5 ${tabAtiva === 'historico' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500'}`}>{historicoSupabase.length}</span>
                         )}
                     </button>
                 </div>
@@ -383,7 +408,7 @@ export default function SupervisorPage() {
                                     <div>
                                         <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Status</p>
                                         <span className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-200">
-                                            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                                            <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
                                             {form.tecnicoValidado.status}
                                         </span>
                                     </div>
@@ -408,31 +433,73 @@ export default function SupervisorPage() {
                                 <p className="text-sm text-gray-400 mb-6">
                                     Itens em carga de <span className="text-gray-700 font-semibold">{form.tecnicoValidado?.nome}</span>. Selecione o que será devolvido.
                                 </p>
+
+                                {/* ── Alerta de bloqueio 45 dias ── */}
+                                {itemBloqueadoAlerta && form.itemSaidaSelecionado && (
+                                    <div className="mb-4 flex items-start gap-3 text-sm bg-gray-50 border border-gray-200 rounded-lg px-4 py-4">
+                                        <span className="text-lg mt-0.5 shrink-0">⚠</span>
+                                        <div>
+                                            <p className="font-semibold text-red-800 mb-1">
+                                                Item bloqueado — Regra de 45 dias
+                                            </p>
+                                            <p className="text-red-700">
+                                                O item <span className="font-semibold">{form.itemSaidaSelecionado.materialNome}</span> foi trocado há menos de 45 dias.
+                                                Não é possível realizar a solicitação.
+                                            </p>
+                                            <p className="text-red-600 mt-1 font-medium">
+                                                Próxima troca permitida em {itemBloqueadoAlerta.dataLiberacao} (faltam {itemBloqueadoAlerta.diasRestantes} dia{itemBloqueadoAlerta.diasRestantes !== 1 ? 's' : ''}).
+                                            </p>
+                                            <button
+                                                onClick={() => { setItemBloqueadoAlerta(null); setForm(prev => ({ ...prev, itemSaidaSelecionado: null })); }}
+                                                className="mt-3 text-xs font-medium text-gray-600 border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-100 transition-colors"
+                                            >
+                                                ← Selecionar outro item
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
+
                                 {cargaTecnico.length === 0 ? (
                                     <div className="border-2 border-dashed border-gray-200 rounded-lg py-10 text-center">
                                         <p className="text-sm text-gray-400">Nenhum material em carga para este técnico</p>
                                     </div>
                                 ) : (
                                     <div className="space-y-2 max-h-96 overflow-y-auto">
-                                        {cargaTecnico.map((item) => (
-                                            <button
-                                                key={item.id}
-                                                id={`btn-item-saida-${item.id}`}
-                                                onClick={() => handleSelecionarItemSaida(item)}
-                                                type="button"
-                                                className="w-full text-left p-4 rounded-lg border border-gray-200 hover:border-gray-400 hover:bg-gray-50 transition-all flex items-center justify-between group"
-                                            >
-                                                <div>
-                                                    <p className="text-sm font-semibold text-gray-800">{item.materialNome}</p>
-                                                    <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
-                                                        <p className="text-xs text-gray-400">Qtd: <span className="text-gray-600">{item.quantidade}</span></p>
-                                                        <p className="text-xs text-gray-400">Data: <span className="text-gray-600">{new Date(item.dataAtribuicao).toLocaleDateString('pt-BR')}</span></p>
-                                                        {item.patrimonio && <p className="text-xs text-gray-400">Patr: <span className="text-gray-600">{item.patrimonio}</span></p>}
+                                        {cargaTecnico.map((item) => {
+                                            const bloqueio = trocasRecentes.get(item.materialNome);
+                                            const estaBloqueado = bloqueio && bloqueio.bloqueado;
+                                            const diasPassados = bloqueio ? 45 - bloqueio.diasRestantes : 0;
+                                            return (
+                                                <button
+                                                    key={item.id}
+                                                    id={`btn-item-saida-${item.id}`}
+                                                    onClick={() => handleSelecionarItemSaida(item)}
+                                                    type="button"
+                                                    className={`w-full text-left p-4 rounded-lg border transition-all flex items-center justify-between group ${estaBloqueado
+                                                        ? 'border-gray-300 bg-gray-50 opacity-75'
+                                                        : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+                                                        }`}
+                                                >
+                                                    <div className="min-w-0 flex-1">
+                                                        <div className="flex items-center gap-2 flex-wrap">
+                                                            <p className={`text-sm font-semibold ${estaBloqueado ? 'text-gray-400' : 'text-gray-800'}`}>{item.materialNome}</p>
+                                                            {estaBloqueado && (
+                                                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 whitespace-nowrap">
+                                                                    🔒 Trocado há {diasPassados} dia{diasPassados !== 1 ? 's' : ''}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
+                                                            <p className="text-xs text-gray-400">Qtd: <span className="text-gray-600">{item.quantidade}</span></p>
+                                                            <p className="text-xs text-gray-400">Data: <span className="text-gray-600">{new Date(item.dataAtribuicao).toLocaleDateString('pt-BR')}</span></p>
+                                                            {item.patrimonio && <p className="text-xs text-gray-400">Patr: <span className="text-gray-600">{item.patrimonio}</span></p>}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                                <span className="text-gray-300 group-hover:text-gray-600 transition-colors text-lg">→</span>
-                                            </button>
-                                        ))}
+                                                    <span className={`transition-colors text-lg shrink-0 ml-2 ${estaBloqueado ? 'text-gray-300' : 'text-gray-300 group-hover:text-gray-600'
+                                                        }`}>{estaBloqueado ? '🔒' : '→'}</span>
+                                                </button>
+                                            );
+                                        })}
                                     </div>
                                 )}
                                 <div className="mt-6 pt-4 border-t border-gray-100">

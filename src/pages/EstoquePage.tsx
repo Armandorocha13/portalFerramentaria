@@ -22,6 +22,8 @@ interface Troca {
     status: StatusEstoque;
     data_troca: string;
     prazo_expirado: boolean;
+    atendido_por: string | null;
+    data_atendimento: string | null;
 }
 
 const LIMITE_RETIRADA_MS = 24 * 60 * 60 * 1000;
@@ -35,10 +37,21 @@ async function getTrocasSupabase(): Promise<Troca[]> {
     return data as Troca[];
 }
 
-async function atualizarStatusSupabase(id: string, status: StatusEstoque, prazo_expirado = false): Promise<void> {
+async function atualizarStatusSupabase(
+    id: string,
+    status: StatusEstoque,
+    prazo_expirado = false,
+    atendido_por?: string
+): Promise<void> {
+    const updateData: Record<string, unknown> = { status, prazo_expirado };
+    // Gravar quem atendeu e quando, se informado
+    if (atendido_por) {
+        updateData.atendido_por = atendido_por;
+        updateData.data_atendimento = new Date().toISOString();
+    }
     const { error } = await supabase
         .from('historico_trocas')
-        .update({ status, prazo_expirado })
+        .update(updateData)
         .eq('id', id);
     if (error) throw error;
 }
@@ -59,7 +72,7 @@ function StatusBadge({ status }: { status: StatusEstoque }) {
         retirado: 'bg-gray-100 text-gray-500 border-gray-200',
     };
     const dots: Record<StatusEstoque, string> = {
-        pedido_em_andamento: 'bg-blue-500 animate-pulse',
+        pedido_em_andamento: 'bg-blue-500',
         sem_estoque: 'bg-red-500',
         liberado_retirada: 'bg-green-500',
         retirado: 'bg-gray-400',
@@ -154,7 +167,7 @@ function TrocaCard({
             </div>
 
             {/* Informações */}
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+            <div className={`grid sm:grid-cols-2 ${troca.atendido_por ? 'lg:grid-cols-5' : 'lg:grid-cols-4'} gap-3 mb-4`}>
                 <div>
                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Supervisor</p>
                     <p className="text-sm font-semibold text-gray-800">{troca.supervisor_nome}</p>
@@ -173,6 +186,15 @@ function TrocaCard({
                     <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Motivo</p>
                     <p className="text-sm text-gray-600">{troca.motivo}</p>
                 </div>
+                {troca.atendido_por && (
+                    <div>
+                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-0.5">Atendido por</p>
+                        <p className="text-sm font-semibold text-gray-800">{troca.atendido_por}</p>
+                        {troca.data_atendimento && (
+                            <p className="text-xs text-gray-400">{new Date(troca.data_atendimento).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}</p>
+                        )}
+                    </div>
+                )}
             </div>
 
             {/* Ações */}
@@ -185,45 +207,47 @@ function TrocaCard({
                 ) : troca.status === 'retirado' ? (
                     <span className="text-sm text-green-600 font-medium">✓ Retirada confirmada — pedido finalizado</span>
                 ) : confirmando ? (
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3">
-                        <span className="text-sm text-gray-700 grow">
+                    <div className="flex flex-col gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 shadow-inner">
+                        <span className="text-sm text-gray-700">
                             {confirmandoRetirada
                                 ? 'Confirmar retirada do item? Isso irá finalizar o pedido.'
                                 : <>Confirmar mudança para: <strong>{LABEL_STATUS[statusSelecionado]}</strong>?</>}
                         </span>
-                        <div className="flex items-center gap-2 shrink-0">
+                        <div className="flex items-center justify-end gap-2 shrink-0">
                             <button
                                 onClick={() => { setConfirmando(false); setConfirmandoRetirada(false); }}
-                                className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-100 transition-colors"
+                                className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 bg-white hover:bg-gray-100 transition-colors"
                             >
                                 Cancelar
                             </button>
                             <button
                                 onClick={handleConfirmar}
-                                className="text-xs px-4 py-1.5 rounded-lg bg-gray-800 text-white hover:bg-gray-900 transition-colors"
+                                className="text-xs px-5 py-1.5 rounded-lg bg-gray-800 text-white hover:bg-gray-900 transition-colors font-semibold"
                             >
                                 Confirmar
                             </button>
                         </div>
                     </div>
                 ) : (
-                    <div className="flex flex-wrap items-center gap-2">
-                        <select
-                            value={statusSelecionado}
-                            onChange={(e) => setStatusSelecionado(e.target.value as StatusEstoque)}
-                            className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:border-gray-400 cursor-pointer"
-                        >
-                            <option value="pedido_em_andamento">Em andamento</option>
-                            <option value="sem_estoque">Sem estoque</option>
-                            <option value="liberado_retirada">Liberado p/ retirada</option>
-                        </select>
-                        <button
-                            onClick={() => setConfirmando(true)}
-                            disabled={statusSelecionado === troca.status}
-                            className="text-xs px-4 py-1.5 rounded-lg bg-gray-800 text-white hover:bg-gray-900 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                        >
-                            Atualizar
-                        </button>
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                        <div className="flex items-center gap-2 grow">
+                            <select
+                                value={statusSelecionado}
+                                onChange={(e) => setStatusSelecionado(e.target.value as StatusEstoque)}
+                                className="flex-1 sm:flex-none text-sm border border-gray-200 rounded-lg px-3 py-1.5 bg-white text-gray-700 focus:outline-none focus:border-gray-400 cursor-pointer"
+                            >
+                                <option value="pedido_em_andamento">Em andamento</option>
+                                <option value="sem_estoque">Sem estoque</option>
+                                <option value="liberado_retirada">Liberado p/ retirada</option>
+                            </select>
+                            <button
+                                onClick={() => setConfirmando(true)}
+                                disabled={statusSelecionado === troca.status}
+                                className="text-xs px-4 py-1.5 rounded-lg bg-gray-800 text-white hover:bg-gray-900 transition-colors disabled:opacity-30 disabled:cursor-not-allowed font-medium"
+                            >
+                                Atualizar
+                            </button>
+                        </div>
                         {troca.status === 'liberado_retirada' && (
                             <button
                                 onClick={() => { setConfirmandoRetirada(true); setConfirmando(true); }}
@@ -260,6 +284,8 @@ function TrocasList({
     const [filtroData, setFiltroData] = useState('');
     const [pagina, setPagina] = useState(1);
     const [exportStatus, setExportStatus] = useState('todos');
+    const [exportDataDe, setExportDataDe] = useState('');
+    const [exportDataAte, setExportDataAte] = useState('');
 
     React.useEffect(() => { setPagina(1); }, [tabAtiva, debouncedBusca, filtroData]);
 
@@ -285,23 +311,56 @@ function TrocasList({
         // Dynamic import: a biblioteca pesada só será baixada quando (e se) o usuário clicar no botão
         const XLSX = await import('xlsx');
 
-        const dados = exportStatus === 'todos' ? todosOsDados : todosOsDados.filter((t) => t.status === exportStatus);
-        const linhas = dados.map((t) => ({
-            'ID': t.id.split('-')[0].toUpperCase(),
-            'Supervisor': t.supervisor_nome,
-            'Matrícula Supervisor': t.supervisor_matricula,
-            'Técnico': t.tecnico_nome,
-            'Matrícula Técnico': t.tecnico_matricula,
-            'Item Devolução': t.item_saida_nome,
-            'Motivo': t.motivo,
-            'Status': LABEL_STATUS[t.status] ?? t.status,
-            'Prazo Expirado': t.prazo_expirado ? 'Sim' : 'Não',
-            'Data': new Date(t.data_troca).toLocaleDateString('pt-BR'),
-        }));
+        let dados = exportStatus === 'todos' ? todosOsDados : todosOsDados.filter((t) => t.status === exportStatus);
+
+        // Filtrar por período
+        if (exportDataDe) {
+            const de = new Date(exportDataDe + 'T00:00:00');
+            dados = dados.filter((t) => new Date(t.data_troca) >= de);
+        }
+        if (exportDataAte) {
+            const ate = new Date(exportDataAte + 'T23:59:59');
+            dados = dados.filter((t) => new Date(t.data_troca) <= ate);
+        }
+
+        const linhas = dados.map((t) => {
+            // Calcular SLA em horas (se atendido)
+            let sla = '';
+            if (t.data_atendimento && t.data_troca) {
+                const diffMs = new Date(t.data_atendimento).getTime() - new Date(t.data_troca).getTime();
+                if (diffMs > 0) {
+                    const h = Math.floor(diffMs / 3_600_000);
+                    const m = Math.floor((diffMs % 3_600_000) / 60_000);
+                    sla = `${h}h ${m}min`;
+                }
+            }
+            return {
+                'ID': t.id.split('-')[0].toUpperCase(),
+                'ID Completo': t.id,
+                'Supervisor': t.supervisor_nome,
+                'Matrícula Supervisor': t.supervisor_matricula,
+                'Técnico': t.tecnico_nome,
+                'Matrícula Técnico': t.tecnico_matricula,
+                'Item Saída (Devolução)': t.item_saida_nome,
+                'Item Entrada (Substituição)': t.item_entrada_nome,
+                'Motivo': t.motivo,
+                'Status': LABEL_STATUS[t.status] ?? t.status,
+                'Prazo Expirado': t.prazo_expirado ? 'Sim' : 'Não',
+                'Data Solicitação': new Date(t.data_troca).toLocaleDateString('pt-BR'),
+                'Hora Solicitação': new Date(t.data_troca).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }),
+                'Atendido por': t.atendido_por || '',
+                'Data Atendimento': t.data_atendimento ? new Date(t.data_atendimento).toLocaleDateString('pt-BR') : '',
+                'Hora Atendimento': t.data_atendimento ? new Date(t.data_atendimento).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }) : '',
+                'SLA (Tempo de Atendimento)': sla,
+            };
+        });
         const ws = XLSX.utils.json_to_sheet(linhas);
         const wb = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(wb, ws, 'Pedidos');
-        XLSX.writeFile(wb, `pedidos_estoque_${new Date().toISOString().slice(0, 10)}.xlsx`);
+        const sufixoPeriodo = exportDataDe || exportDataAte
+            ? `_${exportDataDe || 'inicio'}_a_${exportDataAte || 'hoje'}`
+            : '';
+        XLSX.writeFile(wb, `pedidos_estoque_${new Date().toISOString().slice(0, 10)}${sufixoPeriodo}.xlsx`);
     }
 
     const emptyMsg: Record<typeof tabAtiva, string> = {
@@ -323,46 +382,90 @@ function TrocasList({
                         type="text"
                         value={busca}
                         onChange={(e) => setBusca(e.target.value)}
-                        placeholder="Buscar por técnico, supervisor, matrícula ou ID..."
+                        placeholder="Buscar técnico, supervisor ou ID..."
                         className="w-full pl-10 pr-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:border-gray-400 transition-colors"
                     />
                 </div>
-                <input
-                    type="date"
-                    value={filtroData}
-                    onChange={(e) => setFiltroData(e.target.value)}
-                    className="px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:border-gray-400 transition-colors"
-                />
-                {(busca || filtroData) && (
-                    <button
-                        onClick={() => { setBusca(''); setFiltroData(''); }}
-                        className="text-sm px-3 py-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors whitespace-nowrap"
-                    >
-                        Limpar
-                    </button>
-                )}
-                <div className="flex items-center shrink-0">
-                    <select
-                        value={exportStatus}
-                        onChange={(e) => setExportStatus(e.target.value)}
-                        className="text-sm border border-gray-200 rounded-l-lg px-2 py-2 bg-white text-gray-600 focus:outline-none cursor-pointer"
-                    >
-                        <option value="todos">Todos</option>
-                        <option value="pedido_em_andamento">Em andamento</option>
-                        <option value="liberado_retirada">Liberados</option>
-                        <option value="sem_estoque">Sem estoque</option>
-                        <option value="retirado">Finalizados</option>
-                    </select>
-                    <button
-                        onClick={exportarXLSX}
-                        disabled={todosOsDados.length === 0}
-                        className="flex items-center gap-1.5 text-sm px-3 py-2 border border-l-0 border-gray-200 rounded-r-lg text-gray-600 bg-white hover:bg-gray-50 transition-colors disabled:opacity-40 whitespace-nowrap"
-                    >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                            <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
-                        Excel
-                    </button>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                    <input
+                        type="date"
+                        value={filtroData}
+                        onChange={(e) => setFiltroData(e.target.value)}
+                        className="grow sm:grow-0 px-3 py-2 text-sm border border-gray-200 rounded-lg bg-white text-gray-700 focus:outline-none focus:border-gray-400 transition-colors"
+                    />
+                    {(busca || filtroData) && (
+                        <button
+                            onClick={() => { setBusca(''); setFiltroData(''); }}
+                            className="text-xs px-3 py-2 rounded-lg border border-gray-200 text-gray-500 hover:bg-gray-50 transition-colors whitespace-nowrap"
+                        >
+                            Limpar
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Exportação com filtro de período */}
+            <div className="bg-white border border-gray-200 rounded-lg p-3 sm:p-4">
+                <div className="flex flex-col lg:flex-row lg:items-center gap-3">
+                    <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Extração de Dados</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 grow">
+                        <div className="flex flex-col gap-1 grow sm:grow-0">
+                            <span className="text-[10px] text-gray-400 ml-1">Início</span>
+                            <input
+                                type="date"
+                                value={exportDataDe}
+                                onChange={(e) => setExportDataDe(e.target.value)}
+                                className="w-full sm:w-auto px-2 py-1.5 text-xs border border-gray-200 rounded-md bg-white text-gray-700 focus:outline-none focus:border-gray-400 transition-colors"
+                            />
+                        </div>
+                        <div className="flex flex-col gap-1 grow sm:grow-0">
+                            <span className="text-[10px] text-gray-400 ml-1">Fim</span>
+                            <input
+                                type="date"
+                                value={exportDataAte}
+                                onChange={(e) => setExportDataAte(e.target.value)}
+                                className="w-full sm:w-auto px-2 py-1.5 text-xs border border-gray-200 rounded-md bg-white text-gray-700 focus:outline-none focus:border-gray-400 transition-colors"
+                            />
+                        </div>
+                        <div className="col-span-2 sm:col-span-1 flex flex-col gap-1 grow sm:grow-0">
+                            <span className="text-[10px] text-gray-400 ml-1">Filtrar Status</span>
+                            <select
+                                value={exportStatus}
+                                onChange={(e) => setExportStatus(e.target.value)}
+                                className="w-full sm:w-auto text-xs border border-gray-200 rounded-md px-2 py-1.5 bg-white text-gray-600 focus:outline-none cursor-pointer"
+                            >
+                                <option value="todos">Todos os status</option>
+                                <option value="pedido_em_andamento">Em andamento</option>
+                                <option value="liberado_retirada">Liberados</option>
+                                <option value="sem_estoque">Sem estoque</option>
+                                <option value="retirado">Finalizados</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div className="flex items-center gap-2 pt-2 lg:pt-0 lg:ml-auto">
+                        {(exportDataDe || exportDataAte) && (
+                            <button
+                                onClick={() => { setExportDataDe(''); setExportDataAte(''); }}
+                                className="text-[10px] font-medium px-2 py-1.5 text-gray-400 hover:text-gray-600 transition-colors"
+                            >
+                                Limpar
+                            </button>
+                        )}
+                        <button
+                            onClick={exportarXLSX}
+                            disabled={todosOsDados.length === 0}
+                            className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900 transition-all disabled:opacity-40 shadow-sm"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Exportar Excel
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -422,6 +525,127 @@ function TrocasList({
                         </div>
                     )}
                 </>
+            )}
+        </div>
+    );
+}
+
+// ---- Painel SLA e Métricas ----
+function SlaKpiPanel({ trocas }: { trocas: Troca[] }) {
+    const [mostrarOperadores, setMostrarOperadores] = useState(false);
+
+    const metricas = useMemo(() => {
+        const agora = new Date();
+        const trintaDiasAtras = new Date();
+        trintaDiasAtras.setDate(trintaDiasAtras.getDate() - 30);
+
+        const hojeStr = agora.toISOString().split('T')[0];
+
+        // Filtrar trocas atendidas nos últimos 30 dias
+        const atendidos30d = trocas.filter(t =>
+            t.data_atendimento &&
+            new Date(t.data_atendimento) >= trintaDiasAtras
+        );
+
+        // 1. Tempo médio de atendimento (SLA)
+        let somaMs = 0;
+        let count = 0;
+        for (const t of atendidos30d) {
+            if (t.data_atendimento && t.data_troca) {
+                const diff = new Date(t.data_atendimento).getTime() - new Date(t.data_troca).getTime();
+                if (diff > 0) {
+                    somaMs += diff;
+                    count++;
+                }
+            }
+        }
+        const mediaMs = count > 0 ? somaMs / count : 0;
+        const mediaHoras = Math.floor(mediaMs / 3_600_000);
+        const mediaMin = Math.floor((mediaMs % 3_600_000) / 60_000);
+        const slaFormatado = count > 0 ? `${mediaHoras}h ${mediaMin}min` : '—';
+
+        // 2. Pedidos atendidos hoje
+        const atendidosHoje = trocas.filter(t =>
+            t.data_atendimento &&
+            t.data_atendimento.startsWith(hojeStr)
+        ).length;
+
+        // 3. Prazos expirados no mês
+        const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
+        const expiradosMes = trocas.filter(t =>
+            t.prazo_expirado &&
+            new Date(t.data_troca) >= inicioMes
+        ).length;
+
+        // 4. Atendimentos por operador (últimos 30 dias)
+        const porOperador = new Map<string, number>();
+        for (const t of atendidos30d) {
+            if (t.atendido_por) {
+                porOperador.set(t.atendido_por, (porOperador.get(t.atendido_por) || 0) + 1);
+            }
+        }
+        const operadores = Array.from(porOperador.entries())
+            .sort((a, b) => b[1] - a[1]);
+
+        return { slaFormatado, atendidosHoje, expiradosMes, operadores, totalOperadores: operadores.length };
+    }, [trocas]);
+
+    return (
+        <div className="mb-6">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {/* SLA */}
+                <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
+                    <p className="text-[9px] sm:text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 sm:mb-2">⏱ SLA Médio (30d)</p>
+                    <p className="text-lg sm:text-xl font-bold text-gray-800">{metricas.slaFormatado}</p>
+                    <p className="hidden sm:block text-xs text-gray-400 mt-0.5">Tempo médio de atendimento</p>
+                </div>
+                {/* Atendidos hoje */}
+                <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
+                    <p className="text-[9px] sm:text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 sm:mb-2 text-gray-400">Atendidos Hoje</p>
+                    <p className="text-lg sm:text-xl font-bold text-gray-800">{metricas.atendidosHoje}</p>
+                    <p className="hidden sm:block text-xs text-gray-400 mt-0.5">Pedidos finalizados hoje</p>
+                </div>
+                {/* Prazos expirados */}
+                <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
+                    <p className="text-[9px] sm:text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 sm:mb-2 text-gray-400">Prazos Expirados</p>
+                    <p className="text-lg sm:text-xl font-bold text-gray-800">{metricas.expiradosMes}</p>
+                    <p className="hidden sm:block text-xs text-gray-400 mt-0.5">No mês atual</p>
+                </div>
+                {/* Por operador */}
+                <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 relative">
+                    <p className="text-[9px] sm:text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 sm:mb-2 text-gray-400">Operadores</p>
+                    <p className="text-lg sm:text-xl font-bold text-gray-800">{metricas.totalOperadores}</p>
+                    {metricas.operadores.length > 0 && (
+                        <button
+                            onClick={() => setMostrarOperadores(!mostrarOperadores)}
+                            className="text-[10px] sm:text-xs text-gray-500 mt-0.5 hover:text-gray-700 transition-colors underline"
+                        >
+                            {mostrarOperadores ? 'Ocultar' : 'Ver detalhes'}
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {/* Tabela de operadores expandível */}
+            {mostrarOperadores && metricas.operadores.length > 0 && (
+                <div className="mt-3 bg-white border border-gray-200 rounded-xl overflow-hidden shadow-sm">
+                    <table className="w-full text-left">
+                        <thead className="border-b border-gray-100 bg-gray-50">
+                            <tr>
+                                <th className="px-4 py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Operador</th>
+                                <th className="px-4 py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider text-right">Atendimentos (30d)</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-gray-50">
+                            {metricas.operadores.map(([nome, qtd]) => (
+                                <tr key={nome} className="hover:bg-gray-50 transition-colors">
+                                    <td className="px-4 py-2.5 text-sm text-gray-700">{nome}</td>
+                                    <td className="px-4 py-2.5 text-sm font-semibold text-gray-800 text-right">{qtd}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             )}
         </div>
     );
@@ -508,13 +732,23 @@ export default function EstoquePage() {
         };
     }, [fetchTrocas]);
 
+    // Identificação do operador logado para gravar quem atendeu
+    const operadorInfo = usuario ? `${usuario.nome} (${usuario.matricula})` : undefined;
+
     async function handleAtualizarStatus(id: string, novoStatus: StatusEstoque, expirado = false) {
         setAtualizando(id);
         setErro('');
         try {
-            await atualizarStatusSupabase(id, novoStatus, expirado);
+            await atualizarStatusSupabase(id, novoStatus, expirado, operadorInfo);
+            const agora = new Date().toISOString();
             setTrocas((prev) =>
-                prev.map((t) => (t.id === id ? { ...t, status: novoStatus, prazo_expirado: expirado } : t))
+                prev.map((t) => (t.id === id ? {
+                    ...t,
+                    status: novoStatus,
+                    prazo_expirado: expirado,
+                    atendido_por: operadorInfo || t.atendido_por,
+                    data_atendimento: operadorInfo ? agora : t.data_atendimento,
+                } : t))
             );
             const mensagens: Record<StatusEstoque, string> = {
                 pedido_em_andamento: 'Status atualizado para Em Andamento.',
@@ -581,6 +815,10 @@ export default function EstoquePage() {
 
     return (
         <div className="min-h-screen bg-gray-50">
+            <style>{`
+                .no-scrollbar::-webkit-scrollbar { display: none; }
+                .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+            `}</style>
             {/* Header */}
             <header className="bg-white border-b border-gray-200 sticky top-0 z-50">
                 <div className="max-w-6xl mx-auto px-4 sm:px-6 h-14 flex items-center justify-between gap-4">
@@ -674,8 +912,8 @@ export default function EstoquePage() {
                     </div>
                 )}
 
-                {/* KPI Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
+                {/* KPI Cards — Status */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
                     {tabs.map((tab) => (
                         <button
                             key={tab.key}
@@ -691,20 +929,23 @@ export default function EstoquePage() {
                     ))}
                 </div>
 
+                {/* KPI Cards — SLA e Métricas */}
+                <SlaKpiPanel trocas={trocas} />
+
                 {/* Navegação de tabs */}
-                <div className="flex gap-1 mb-4 border-b border-gray-200">
+                <div className="flex gap-1 mb-4 border-b border-gray-200 overflow-x-auto no-scrollbar scroll-smooth">
                     {tabs.map((tab) => (
                         <button
                             key={tab.key}
                             onClick={() => setTabAtiva(tab.key)}
-                            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px ${tabAtiva === tab.key
+                            className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap shrink-0 ${tabAtiva === tab.key
                                 ? 'border-gray-800 text-gray-800'
                                 : 'border-transparent text-gray-400 hover:text-gray-600'
                                 }`}
                         >
                             {tab.label}
                             {tab.count > 0 && (
-                                <span className={`ml-1.5 text-xs px-1.5 py-0.5 rounded-full ${tabAtiva === tab.key ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                                <span className={`ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full ${tabAtiva === tab.key ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-500'}`}>
                                     {tab.count}
                                 </span>
                             )}

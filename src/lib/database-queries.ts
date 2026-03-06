@@ -1,6 +1,124 @@
 import { supabase } from './supabase';
 import type { Tecnico, ItemCarga, Material } from '../types';
 
+// ============================================================
+// REGRA DE NEGÓCIO: Trava de 45 dias
+// ============================================================
+
+const DIAS_CARENCIA = 45;
+
+export interface ResultadoTrocaRecente {
+    bloqueado: boolean;
+    diasRestantes: number;
+    dataTroca: string;      // ISO date string da última troca
+    dataLiberacao: string;   // DD/MM/AAAA formatado para exibição
+}
+
+/**
+ * 🔒 Verifica se um item específico foi trocado nos últimos 45 dias
+ * para o técnico informado.
+ */
+export async function verificarTrocaRecente(
+    tecnicoMatricula: string,
+    itemNome: string
+): Promise<ResultadoTrocaRecente | null> {
+    // 1. Buscar o UUID do técnico pela matrícula
+    const { data: tecnico } = await supabase
+        .from('tecnicos')
+        .select('id')
+        .eq('matricula', tecnicoMatricula.toUpperCase())
+        .single();
+
+    if (!tecnico) return null;
+
+    // 2. Consultar última troca do item nos últimos 45 dias
+    const dataLimite = new Date();
+    dataLimite.setDate(dataLimite.getDate() - DIAS_CARENCIA);
+
+    const { data, error } = await supabase
+        .from('historico_trocas')
+        .select('data_troca')
+        .eq('tecnico_id', tecnico.id)
+        .eq('item_saida_nome', itemNome)
+        .gte('data_troca', dataLimite.toISOString())
+        .order('data_troca', { ascending: false })
+        .limit(1);
+
+    if (error || !data || data.length === 0) return null;
+
+    const dataTroca = new Date(data[0].data_troca);
+    const dataLib = new Date(dataTroca);
+    dataLib.setDate(dataLib.getDate() + DIAS_CARENCIA);
+
+    const agora = new Date();
+    const diffMs = dataLib.getTime() - agora.getTime();
+    const diasRestantes = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+
+    return {
+        bloqueado: diasRestantes > 0,
+        diasRestantes,
+        dataTroca: data[0].data_troca,
+        dataLiberacao: dataLib.toLocaleDateString('pt-BR'),
+    };
+}
+
+/**
+ * 🔒 Busca todas as trocas recentes (< 45 dias) para um técnico.
+ * Retorna um Map<itemNome, ResultadoTrocaRecente> para exibir badges na lista.
+ */
+export async function verificarTrocasRecentesBatch(
+    tecnicoMatricula: string
+): Promise<Map<string, ResultadoTrocaRecente>> {
+    const resultado = new Map<string, ResultadoTrocaRecente>();
+
+    // 1. Buscar UUID do técnico
+    const { data: tecnico } = await supabase
+        .from('tecnicos')
+        .select('id')
+        .eq('matricula', tecnicoMatricula.toUpperCase())
+        .single();
+
+    if (!tecnico) return resultado;
+
+    // 2. Buscar todas as trocas dos últimos 45 dias
+    const dataLimite = new Date();
+    dataLimite.setDate(dataLimite.getDate() - DIAS_CARENCIA);
+
+    const { data, error } = await supabase
+        .from('historico_trocas')
+        .select('item_saida_nome, data_troca')
+        .eq('tecnico_id', tecnico.id)
+        .gte('data_troca', dataLimite.toISOString())
+        .order('data_troca', { ascending: false });
+
+    if (error || !data) return resultado;
+
+    const agora = new Date();
+
+    for (const row of data) {
+        // Manter apenas a troca mais recente de cada item
+        if (resultado.has(row.item_saida_nome)) continue;
+
+        const dataTroca = new Date(row.data_troca);
+        const dataLib = new Date(dataTroca);
+        dataLib.setDate(dataLib.getDate() + DIAS_CARENCIA);
+
+        const diffMs = dataLib.getTime() - agora.getTime();
+        const diasRestantes = Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+
+        if (diasRestantes > 0) {
+            resultado.set(row.item_saida_nome, {
+                bloqueado: true,
+                diasRestantes,
+                dataTroca: row.data_troca,
+                dataLiberacao: dataLib.toLocaleDateString('pt-BR'),
+            });
+        }
+    }
+
+    return resultado;
+}
+
 /** 🔍 Busca técnico e valida o supervisor dele */
 export async function getTecnico(matricula: string, supervisorId: string): Promise<Tecnico | null> {
     const { data, error } = await supabase
