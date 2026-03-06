@@ -25,7 +25,7 @@ export async function verificarTrocaRecente(
     // 1. Buscar o UUID do técnico pela matrícula
     const { data: tecnico } = await supabase
         .from('tecnicos')
-        .select('id')
+        .select('matricula')
         .eq('matricula', tecnicoMatricula.toUpperCase())
         .single();
 
@@ -38,7 +38,7 @@ export async function verificarTrocaRecente(
     const { data, error } = await supabase
         .from('historico_trocas')
         .select('data_troca')
-        .eq('tecnico_id', tecnico.id)
+        .eq('tecnico_matricula', tecnico.matricula)
         .eq('item_saida_nome', itemNome)
         .gte('data_troca', dataLimite.toISOString())
         .order('data_troca', { ascending: false })
@@ -74,7 +74,7 @@ export async function verificarTrocasRecentesBatch(
     // 1. Buscar UUID do técnico
     const { data: tecnico } = await supabase
         .from('tecnicos')
-        .select('id')
+        .select('matricula')
         .eq('matricula', tecnicoMatricula.toUpperCase())
         .single();
 
@@ -87,7 +87,7 @@ export async function verificarTrocasRecentesBatch(
     const { data, error } = await supabase
         .from('historico_trocas')
         .select('item_saida_nome, data_troca')
-        .eq('tecnico_id', tecnico.id)
+        .eq('tecnico_matricula', tecnico.matricula)
         .gte('data_troca', dataLimite.toISOString())
         .order('data_troca', { ascending: false });
 
@@ -125,7 +125,7 @@ export async function getTecnico(matricula: string, supervisorId: string): Promi
         .from('tecnicos')
         .select('*')
         .eq('matricula', matricula.toUpperCase())
-        .eq('supervisor_id', supervisorId)
+        .eq('supervisor_matricula', supervisorId)
         .single();
 
     if (error || !data) return null;
@@ -206,7 +206,7 @@ export async function registrarTroca(dados: {
     // Pegar informações do técnico
     const { data: tecnico } = await supabase
         .from('tecnicos')
-        .select('id, nome, cargo, setor')
+        .select('matricula, nome, cargo, setor')
         .eq('matricula', dados.tecnico_matricula.toUpperCase())
         .single();
 
@@ -226,7 +226,7 @@ export async function registrarTroca(dados: {
             supervisor_id: dados.supervisor_id,
             supervisor_matricula: dados.supervisor_matricula,
             supervisor_nome: dados.supervisor_nome,
-            tecnico_id: tecnico.id,
+            tecnico_id: null, // Nullificado, já que uuid não existe mais
             tecnico_matricula: dados.tecnico_matricula,
             tecnico_nome: tecnico.nome,
             tecnico_cargo: tecnico.cargo,
@@ -251,11 +251,8 @@ export async function getHistoricoTrocas(supervisorId: string, page = 1, pageSiz
 
     const { data, count, error } = await supabase
         .from('historico_trocas')
-        .select(`
-            *,
-            tecnico:tecnico_id (nome, matricula)
-        `, { count: 'exact' })
-        .eq('supervisor_id', supervisorId)
+        .select('*', { count: 'exact' })
+        .eq('supervisor_matricula', supervisorId)
         .order('data_troca', { ascending: false })
         .range(start, end);
 
