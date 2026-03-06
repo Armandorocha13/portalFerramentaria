@@ -136,7 +136,7 @@ function TimeAgoLabel({ status, dataTroca, dataAtendimento }: { status: StatusEs
 
     if (dias === 0) return null;
 
-    const texto = status === 'retirado' ? 'Finalizado há' : 'Aberto há';
+    const texto = status === 'retirado' ? 'Atendimento finalizado há' : 'Pedido aberto há';
 
     return (
         <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap">
@@ -192,8 +192,8 @@ function TrocaCard({
                         </span>
                     )}
                 </div>
-                <div className="flex flex-col items-end gap-0.5 shrink-0 hidden sm:flex">
-                    <span className="text-xs text-gray-400">{dataFormatada}</span>
+                <div className="flex flex-col items-end gap-0.5 shrink-0">
+                    <span className="text-xs text-gray-400 hidden sm:block">{dataFormatada}</span>
                     <TimeAgoLabel
                         status={troca.status}
                         dataTroca={troca.data_troca}

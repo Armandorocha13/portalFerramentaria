@@ -86,7 +86,7 @@ function TimeAgoLabel({ status, dataSolicitacao }: { status: string; dataSolicit
     const dias = calcularDias(dataSolicitacao);
     if (dias === 0) return null;
 
-    const texto = status === 'retirado' ? 'Finalizado há' : 'Aberto há';
+    const texto = status === 'retirado' ? 'Atendimento finalizado há' : 'Pedido aberto há';
 
     return (
         <span className="text-[10px] text-gray-400 font-medium whitespace-nowrap mt-1">
