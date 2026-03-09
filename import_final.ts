@@ -34,8 +34,33 @@ const supabase = createClient(supabaseUrl!, supabaseKey!);
 async function importFinal() {
     console.log("Iniciando Importação Definitiva...");
 
-    // 1. Mapa de Supervisores
-    // Vamos usar a MATRÍCULA como chave para garantir que não hajam repetidos e que as FKs funcionem.
+    // 1. Mapeamento Geral de Equipes (EQUIPES.xlsx)
+    // Precisamos ler este arquivo primeiro para ter as matrículas corretas de todos (inclusive supervisores)
+    const wbEquipes = xlsx.readFile('BaseDeDados/EQUIPES.xlsx');
+    const dbEquipes = xlsx.utils.sheet_to_json(wbEquipes.Sheets['SINAPSE'], { header: 1, defval: '' }).slice(1);
+
+    // Mapa universal de NOME -> MATRICULA (da coluna A)
+    const mapGeralNomesMatriculas = new Map();
+    const mapEquipesInfo = new Map();
+
+    dbEquipes.forEach(r => {
+        const matriculaCorreta = String(r[0]).trim();
+        const nome = String(r[1]).trim().toUpperCase();
+        if (!nome) return;
+
+        mapGeralNomesMatriculas.set(nome, matriculaCorreta);
+
+        if (!mapEquipesInfo.has(nome) || (r[10] && !mapEquipesInfo.get(nome).matricula)) {
+            mapEquipesInfo.set(nome, {
+                matricula: String(r[10]).trim() || matriculaCorreta,
+                codSup: String(r[4]).trim()
+            });
+        }
+    });
+
+    console.log(`- ${mapGeralNomesMatriculas.size} Nomes mapeados do EQUIPES.xlsx.`);
+
+    // 2. Mapa de Supervisores
     const mapSupsByMatricula = new Map();
     const mapSupsByName = new Map();
 
@@ -45,16 +70,20 @@ async function importFinal() {
         lines.forEach(l => {
             const p = l.split('\t');
             if (p.length >= 2) {
-                const mat = p[0].trim();
                 const nomeRaw = p[1].trim();
+                const nomeUpper = nomeRaw.toUpperCase();
+
+                // Pega a matrícula do EQUIPES.xlsx (coluna A) em vez do arquivo de texto
+                const matCorreta = mapGeralNomesMatriculas.get(nomeUpper) || p[0].trim(); // Fallback pro texto se não achar
+
                 const obj = {
-                    matricula: mat,
+                    matricula: matCorreta,
                     nome: nomeRaw,
                     situacao: 'ATIVO',
-                    senha: mat
+                    senha: matCorreta
                 };
-                mapSupsByMatricula.set(mat, obj);
-                mapSupsByName.set(nomeRaw.toUpperCase(), obj);
+                mapSupsByMatricula.set(matCorreta, obj);
+                mapSupsByName.set(nomeUpper, obj);
             }
         });
     }
@@ -65,22 +94,7 @@ async function importFinal() {
         mapSupsByMatricula.set('000000', def);
         mapSupsByName.set('DESCONHECIDO', def);
     }
-    console.log(`- ${mapSupsByMatricula.size} Supervisores mapeados.`);
-
-    // 2. Mapeamento de Técnicos (EQUIPES.xlsx)
-    const wbEquipes = xlsx.readFile('BaseDeDados/EQUIPES.xlsx');
-    const dbEquipes = xlsx.utils.sheet_to_json(wbEquipes.Sheets['SINAPSE'], { header: 1, defval: '' }).slice(1);
-    const mapEquipesInfo = new Map();
-    dbEquipes.forEach(r => {
-        const nome = String(r[1]).trim().toUpperCase();
-        if (!nome) return;
-        if (!mapEquipesInfo.has(nome) || (r[10] && !mapEquipesInfo.get(nome).matricula)) {
-            mapEquipesInfo.set(nome, {
-                matricula: String(r[10]).trim(),
-                codSup: String(r[4]).trim()
-            });
-        }
-    });
+    console.log(`- ${mapSupsByMatricula.size} Supervisores mapeados de acordo com EQUIPES.xlsx.`);
 
     // 3. Processar FORCA.xlsx
     const wbForca = xlsx.readFile('BaseDeDados/FORCA.xlsx');
@@ -99,25 +113,37 @@ async function importFinal() {
 
         if (!nome) return;
 
-        const info = mapEquipesInfo.get(nome.toUpperCase());
-        const matricula = (info && info.matricula) ? info.matricula : `GEN-${tecnicosFinal.length}`;
+        // Pega a matrícula do técnico da coluna A do EQUIPES.xlsx (via nosso mapa de nomes)
+        const matricula = mapGeralNomesMatriculas.get(nome.toUpperCase()) || `GEN-${tecnicosFinal.length}`;
 
         // Determinar supervisor matricula
-        let matSup = mapSupsByName.get(nomeSup)?.matricula || info?.codSup || '000000';
+        let matSup = mapSupsByName.get(nomeSup)?.matricula;
 
-        // Se a matSup encontrada não estiver no nosso mapa de supervisores, precisamos adicioná-la ou usar 000000
-        if (matSup !== '000000' && !mapSupsByMatricula.has(matSup)) {
-            // Tenta criar um supervisor "fantasma" se tivermos o nome
-            if (nomeSup && nomeSup !== 'ETN' && nomeSup !== 'AFASTADO INSS') {
-                mapSupsByMatricula.set(matSup, {
+        // Se não achou na lista oficial, tenta no mapa geral (coluna A do EQUIPES.xlsx)
+        if (!matSup && nomeSup && nomeSup !== 'ETN' && nomeSup !== 'AFASTADO INSS') {
+            matSup = mapGeralNomesMatriculas.get(nomeSup);
+
+            // Se achou no mapa geral, vamos adicionar esse supervisor para não dar erro de FK
+            if (matSup && !mapSupsByMatricula.has(matSup)) {
+                const newSup = {
                     matricula: matSup,
-                    nome: r[5].trim(),
+                    nome: r[5].trim(), // Nome original do FORCA.xlsx
                     situacao: 'ATIVO',
                     senha: matSup
-                });
-            } else {
-                matSup = '000000';
+                };
+                mapSupsByMatricula.set(matSup, newSup);
+                mapSupsByName.set(nomeSup, newSup);
             }
+        }
+
+        // Fallback: se ainda não tiver matricula de supervisor, usa o codSup do EQUIPES ou 000000
+        if (!matSup) {
+            matSup = mapEquipesInfo.get(nome.toUpperCase())?.codSup || '000000';
+        }
+
+        // Se a matSup final ainda não estiver no nosso mapa, volta pro 000000
+        if (matSup !== '000000' && !mapSupsByMatricula.has(matSup)) {
+            matSup = '000000';
         }
 
         tecnicosFinal.push({
