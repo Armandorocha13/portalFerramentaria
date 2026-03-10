@@ -90,7 +90,6 @@ export interface Supervisor {
 export interface FormularioTroca {
     tecnicoMatricula: string;
     tecnicoValidado: Tecnico | null;
-    itemSaidaSelecionado: ItemCarga | null;
-    materialEntradaSelecionado: Material | null;
-    motivo: string;
+    itensSelecionados: ItemCarga[];
+    motivos: Record<string, string>;
 }

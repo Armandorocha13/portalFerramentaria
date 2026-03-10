@@ -16,9 +16,8 @@ const STEPS = ['Identificação', 'Validação', 'Selecione o item', 'Motivo', '
 const INITIAL_FORM: FormularioTroca = {
     tecnicoMatricula: '',
     tecnicoValidado: null,
-    itemSaidaSelecionado: null,
-    materialEntradaSelecionado: null,
-    motivo: '',
+    itensSelecionados: [],
+    motivos: {},
 };
 
 // ---- Badge de Status ----
@@ -120,6 +119,7 @@ export default function SupervisorPage() {
     const [salvandoSenha, setSalvandoSenha] = useState(false);
     const [senhaErro, setSenhaErro] = useState('');
     const [senhaSucesso, setSenhaSucesso] = useState('');
+    const [showCutoffAlert, setShowCutoffAlert] = useState(false);
 
     // ── Trava de 45 dias ──
     const [trocasRecentes, setTrocasRecentes] = useState<Map<string, ResultadoTrocaRecente>>(new Map());
@@ -190,6 +190,9 @@ export default function SupervisorPage() {
             setTrocasRecentes(recentes);
             setForm((prev) => ({ ...prev, tecnicoValidado: tecnico }));
             setStep(1);
+
+            // Verificar Horário de Corte (Forçado para teste)
+            setShowCutoffAlert(true);
         } catch (err: any) {
             setErro(err.message || 'Erro ao consultar técnico.');
         } finally {
@@ -202,60 +205,85 @@ export default function SupervisorPage() {
         const bloqueio = trocasRecentes.get(item.materialNome);
         if (bloqueio && bloqueio.bloqueado) {
             setItemBloqueadoAlerta(bloqueio);
-            setForm((prev) => ({
-                ...prev,
-                itemSaidaSelecionado: item,
-                materialEntradaSelecionado: null,
-            }));
-            // NÃO avança para o próximo step
+            // Mantém selecionado apenas para exibição do alerta
             return;
         }
+
+        setForm((prev) => {
+            const jaSelecionado = prev.itensSelecionados.some((i: ItemCarga) => i.id === item.id);
+            if (jaSelecionado) {
+                // Remove se clicar de novo
+                const novosItens = prev.itensSelecionados.filter((i: ItemCarga) => i.id !== item.id);
+                const novosMotivos = { ...prev.motivos };
+                delete novosMotivos[item.id];
+                return { ...prev, itensSelecionados: novosItens, motivos: novosMotivos };
+            } else {
+                // Adiciona à lista
+                return { ...prev, itensSelecionados: [...prev.itensSelecionados, item] };
+            }
+        });
         setItemBloqueadoAlerta(null);
-        setForm((prev) => ({
-            ...prev,
-            itemSaidaSelecionado: item,
-            materialEntradaSelecionado: { id: item.materialId, nome: item.materialNome, categoria: 'Geral', codigo: item.materialId }
-        }));
+    }
+
+    function handleProsseguirParaMotivos() {
+        if (form.itensSelecionados.length === 0) {
+            setErro('Selecione ao menos um item para continuar.');
+            return;
+        }
+        setErro('');
         setStep(3);
     }
 
-    function handleMotivo(e: FormEvent) {
+    function handleValidarMotivos(e: FormEvent) {
         e.preventDefault();
-        if (!form.motivo.trim()) { setErro('Informe o motivo da troca.'); return; }
+        const todosComMotivo = form.itensSelecionados.every((item: ItemCarga) => form.motivos[item.id]);
+        if (!todosComMotivo) {
+            setErro('Por favor, informe o motivo para todos os itens selecionados.');
+            return;
+        }
         setErro('');
         setStep(4);
     }
 
     async function handleConfirmar() {
-        if (!usuario || !form.tecnicoValidado || !form.itemSaidaSelecionado || !form.materialEntradaSelecionado) return;
+        if (!usuario || !form.tecnicoValidado || form.itensSelecionados.length === 0) return;
         setLoading(true);
         try {
-            await registrarTroca({
-                supervisor_id: usuario.id,
-                supervisor_matricula: usuario.matricula,
-                supervisor_nome: usuario.nome,
-                tecnico_matricula: form.tecnicoValidado.matricula,
-                item_saida_id: form.itemSaidaSelecionado.id,
-                material_entrada_nome: form.materialEntradaSelecionado.nome,
-                motivo: form.motivo.trim(),
-            });
+            const promessas = form.itensSelecionados.map((item: ItemCarga) =>
+                registrarTroca({
+                    supervisor_id: usuario.id,
+                    supervisor_matricula: usuario.matricula,
+                    supervisor_nome: usuario.nome,
+                    tecnico_matricula: form.tecnicoValidado!.matricula,
+                    item_saida_id: item.id,
+                    material_entrada_nome: item.materialNome, // Assume entrada = saída por padrão
+                    motivo: form.motivos[item.id],
+                })
+            );
+
+            await Promise.all(promessas);
+
             const agora = new Date().toISOString().split('T')[0];
             const prazo = calcularPrazoD1(agora);
-            const nova = adicionarSolicitacao({
-                supervisorMatricula: usuario.matricula,
-                tecnicoMatricula: form.tecnicoValidado.matricula,
-                tecnicoNome: form.tecnicoValidado.nome,
-                itemSaidaId: form.itemSaidaSelecionado.id,
-                itemSaidaNome: form.itemSaidaSelecionado.materialNome,
-                itemSaidaPatrimonio: form.itemSaidaSelecionado.patrimonio,
-                materialEntradaId: form.materialEntradaSelecionado.id,
-                materialEntradaNome: form.materialEntradaSelecionado.nome,
-                motivo: form.motivo.trim(),
-                dataSolicitacao: agora,
-                prazoResolucao: prazo,
-                status: 'pendente',
+
+            form.itensSelecionados.forEach((item: ItemCarga) => {
+                adicionarSolicitacao({
+                    supervisorMatricula: usuario.matricula,
+                    tecnicoMatricula: form.tecnicoValidado!.matricula,
+                    tecnicoNome: form.tecnicoValidado!.nome,
+                    itemSaidaId: item.id,
+                    itemSaidaNome: item.materialNome,
+                    itemSaidaPatrimonio: item.patrimonio,
+                    materialEntradaId: item.materialId,
+                    materialEntradaNome: item.materialNome,
+                    motivo: form.motivos[item.id],
+                    dataSolicitacao: agora,
+                    prazoResolucao: prazo,
+                    status: 'pendente',
+                });
             });
-            setSucesso(`Solicitação ${nova.id} registrada com sucesso!`);
+
+            setSucesso(`${form.itensSelecionados.length} solicitações registradas com sucesso!`);
             setForm({ ...INITIAL_FORM });
             setStep(0);
             setErro('');
@@ -271,7 +299,7 @@ export default function SupervisorPage() {
         setErro('');
         setItemBloqueadoAlerta(null);
         if (step === 1) setForm((prev) => ({ ...prev, tecnicoValidado: null }));
-        if (step === 3) setForm((prev) => ({ ...prev, itemSaidaSelecionado: null, materialEntradaSelecionado: null }));
+        if (step === 3) setErro(''); // Limpa erro ao voltar do Step 3
         setStep((prev) => Math.max(0, prev - 1));
     }
 
@@ -395,6 +423,34 @@ export default function SupervisorPage() {
                         <p className="text-xs text-gray-400 mt-0.5">Pedido #{notificacao.id.split('-')[0].toUpperCase()}</p>
                     </div>
                     <button onClick={() => setNotificacao(null)} className="text-gray-300 hover:text-gray-500 text-xl leading-none">&times;</button>
+                </div>
+            )}
+
+            {/* Modal Horário de Corte (Aviso D+2) */}
+            {showCutoffAlert && (
+                <div className="fixed inset-0 z-[250] flex items-center justify-center px-4 bg-black/60 backdrop-blur-md">
+                    <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-in fade-in zoom-in duration-300">
+                        <div className="bg-amber-500 p-4 flex justify-center">
+                            <span className="text-4xl text-white">⏰</span>
+                        </div>
+                        <div className="p-6 text-center">
+                            <h2 className="text-lg font-bold text-gray-800 mb-2">Atenção ao Prazo</h2>
+                            <p className="text-sm text-gray-500 leading-relaxed mb-6">
+                                Devido ao horário (após às <span className="font-bold text-amber-600">15:00</span>),
+                                esta solicitação será atendida em <span className="font-bold text-gray-800">D+2</span>.
+                                <br /><br />
+                                <span className="text-xs italic text-gray-400">
+                                    O prazo padrão D+1 é válido apenas para pedidos realizados até às 15h.
+                                </span>
+                            </p>
+                            <button
+                                onClick={() => setShowCutoffAlert(false)}
+                                className="w-full bg-gray-800 text-white font-semibold py-3 rounded-xl hover:bg-gray-900 transition-all shadow-md active:scale-95"
+                            >
+                                Compreendido
+                            </button>
+                        </div>
+                    </div>
                 </div>
             )}
 
@@ -543,31 +599,30 @@ export default function SupervisorPage() {
                         {/* STEP 2: Selecione o item */}
                         {step === 2 && (
                             <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8">
-                                <h2 className="text-lg font-semibold text-gray-800 mb-1">Selecione o Item</h2>
+                                <h2 className="text-lg font-semibold text-gray-800 mb-1">Selecione os Itens</h2>
                                 <p className="text-sm text-gray-400 mb-6">
-                                    Itens em carga de <span className="text-gray-700 font-semibold">{form.tecnicoValidado?.nome}</span>. Selecione o que será devolvido.
+                                    Itens em carga de <span className="text-gray-700 font-semibold">{form.tecnicoValidado?.nome}</span>. Selecione um ou mais itens para devolução.
                                 </p>
 
                                 {/* ── Alerta de bloqueio 45 dias ── */}
-                                {itemBloqueadoAlerta && form.itemSaidaSelecionado && (
-                                    <div className="mb-4 flex items-start gap-3 text-sm bg-gray-50 border border-gray-200 rounded-lg px-4 py-4">
+                                {itemBloqueadoAlerta && (
+                                    <div className="mb-4 flex items-start gap-3 text-sm bg-gray-50 border border-gray-200 rounded-lg px-4 py-4 bounce-in">
                                         <span className="text-lg mt-0.5 shrink-0">⚠</span>
                                         <div>
                                             <p className="font-semibold text-red-800 mb-1">
                                                 Item bloqueado — Regra de 45 dias
                                             </p>
                                             <p className="text-red-700">
-                                                O item <span className="font-semibold">{form.itemSaidaSelecionado.materialNome}</span> foi trocado há menos de 45 dias.
-                                                Não é possível realizar a solicitação.
+                                                Este item foi trocado recentemente e não pode ser selecionado novamente.
                                             </p>
-                                            <p className="text-red-600 mt-1 font-medium">
+                                            <p className="text-red-600 mt-1 font-medium text-xs">
                                                 Próxima troca permitida em {itemBloqueadoAlerta.dataLiberacao} (faltam {itemBloqueadoAlerta.diasRestantes} dia{itemBloqueadoAlerta.diasRestantes !== 1 ? 's' : ''}).
                                             </p>
                                             <button
-                                                onClick={() => { setItemBloqueadoAlerta(null); setForm(prev => ({ ...prev, itemSaidaSelecionado: null })); }}
+                                                onClick={() => { setItemBloqueadoAlerta(null); }}
                                                 className="mt-3 text-xs font-medium text-gray-600 border border-gray-300 px-3 py-1.5 rounded-md hover:bg-gray-100 transition-colors"
                                             >
-                                                ← Selecionar outro item
+                                                Fechar Aviso
                                             </button>
                                         </div>
                                     </div>
@@ -602,7 +657,7 @@ export default function SupervisorPage() {
                                         <p className="text-sm text-gray-400">Nenhum material em carga para este técnico</p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                                    <div className="space-y-2 max-h-96 overflow-y-auto pr-1 custom-scrollbar">
                                         {cargaTecnico
                                             .filter(item =>
                                                 item.materialNome.toLowerCase().includes(filtroItem.toLowerCase()) ||
@@ -611,136 +666,182 @@ export default function SupervisorPage() {
                                             .map((item) => {
                                                 const bloqueio = trocasRecentes.get(item.materialNome);
                                                 const estaBloqueado = bloqueio && bloqueio.bloqueado;
-                                                const diasPassados = bloqueio ? 45 - bloqueio.diasRestantes : 0;
+                                                const isSelected = form.itensSelecionados.some(i => i.id === item.id);
+
                                                 return (
                                                     <button
                                                         key={item.id}
                                                         id={`btn-item-saida-${item.id}`}
                                                         onClick={() => handleSelecionarItemSaida(item)}
                                                         type="button"
-                                                        className={`w-full text-left p-4 rounded-lg border transition-all flex items-center justify-between group ${estaBloqueado
-                                                            ? 'border-gray-300 bg-gray-50 opacity-75'
-                                                            : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+                                                        className={`w-full text-left p-4 rounded-xl border transition-all flex items-center justify-between group ${estaBloqueado
+                                                            ? 'border-gray-100 bg-gray-50/50 opacity-50 cursor-not-allowed'
+                                                            : isSelected
+                                                                ? 'border-gray-800 bg-gray-50 ring-2 ring-gray-800/5'
+                                                                : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
                                                             }`}
                                                     >
                                                         <div className="min-w-0 flex-1">
                                                             <div className="flex items-center gap-2 flex-wrap">
-                                                                <p className={`text-sm font-semibold ${estaBloqueado ? 'text-gray-400' : 'text-gray-800'}`}>{item.materialNome}</p>
+                                                                <div className={`w-4 h-4 rounded border flex items-center justify-center transition-colors ${isSelected ? 'bg-gray-800 border-gray-800' : 'border-gray-300 bg-white'}`}>
+                                                                    {isSelected && <span className="text-[10px] text-white">✓</span>}
+                                                                </div>
+                                                                <p className={`text-sm font-semibold ${isSelected ? 'text-gray-900' : 'text-gray-700'}`}>{item.materialNome}</p>
                                                                 {estaBloqueado && (
                                                                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 whitespace-nowrap">
-                                                                        🔒 Trocado há {diasPassados} dia{diasPassados !== 1 ? 's' : ''}
+                                                                        🔒 Bloqueado
                                                                     </span>
                                                                 )}
                                                             </div>
-                                                            <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
+                                                            <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1.5 ml-6">
                                                                 <p className="text-xs text-gray-400">Qtd: <span className="text-gray-600">{item.quantidade}</span></p>
-                                                                <p className="text-xs text-gray-400">Data: <span className="text-gray-600">{new Date(item.dataAtribuicao).toLocaleDateString('pt-BR')}</span></p>
-                                                                {item.patrimonio && <p className="text-xs text-gray-400">Patr: <span className="text-gray-600">{item.patrimonio}</span></p>}
+                                                                <p className="text-xs text-gray-400">Atribuição: <span className="text-gray-600">{new Date(item.dataAtribuicao).toLocaleDateString('pt-BR')}</span></p>
                                                             </div>
                                                         </div>
-                                                        <span className={`transition-colors text-lg shrink-0 ml-2 ${estaBloqueado ? 'text-gray-300' : 'text-gray-300 group-hover:text-gray-600'
-                                                            }`}>{estaBloqueado ? '🔒' : '→'}</span>
+                                                        <span className={`text-lg transition-transform ${isSelected ? 'scale-110 text-gray-800' : 'text-gray-300 shrink-0 ml-2 group-hover:text-gray-400'}`}>
+                                                            {isSelected ? '✓' : '＋'}
+                                                        </span>
                                                     </button>
                                                 );
                                             })}
                                     </div>
                                 )}
-                                <div className="mt-6 pt-4 border-t border-gray-100">
+                                <div className="mt-8 pt-6 border-t border-gray-100 flex items-center justify-between">
                                     <button id="btn-voltar-step2" onClick={handleVoltar} type="button"
-                                        className="text-sm text-gray-400 hover:text-gray-700 transition-colors">
-                                        ← Alterar Colaborador
+                                        className="text-sm font-medium text-gray-400 hover:text-gray-700 transition-colors">
+                                        ← Alterar Técnico
                                     </button>
+                                    <div className="flex items-center gap-4">
+                                        {form.itensSelecionados.length > 0 && (
+                                            <span className="text-[10px] font-bold uppercase tracking-widest text-gray-400 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                                                {form.itensSelecionados.length} {form.itensSelecionados.length === 1 ? 'item' : 'itens'}
+                                            </span>
+                                        )}
+                                        <button
+                                            onClick={handleProsseguirParaMotivos}
+                                            disabled={form.itensSelecionados.length === 0}
+                                            className="bg-gray-800 text-white text-sm font-semibold px-6 py-2.5 rounded-xl hover:bg-gray-900 transition-all disabled:opacity-30 shadow-sm active:scale-95"
+                                        >
+                                            Prosseguir →
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
                         )}
 
-                        {/* STEP 3: Motivo */}
+                        {/* STEP 3: Motivos Individuais */}
                         {step === 3 && (
-                            <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8">
-                                <h2 className="text-lg font-semibold text-gray-800 mb-1">Motivo da Troca</h2>
-                                <p className="text-sm text-gray-400 mb-6">
-                                    Substituição de: <span className="text-gray-700 font-semibold">{form.itemSaidaSelecionado?.materialNome}</span>
+                            <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+                                <h2 className="text-lg font-bold text-gray-800 mb-1">Motivos da Troca</h2>
+                                <p className="text-sm text-gray-400 mb-8">
+                                    Justifique a solicitação para cada um dos <span className="text-gray-700 font-semibold">{form.itensSelecionados.length} itens</span> selecionados.
                                 </p>
-                                <form onSubmit={handleMotivo} className="space-y-5">
-                                    <div>
-                                        <label htmlFor="select-motivo" className="block text-xs font-medium text-gray-500 mb-1.5">
-                                            Motivo da Solicitação
-                                        </label>
-                                        <div className="relative">
-                                            <select
-                                                id="select-motivo"
-                                                value={form.motivo}
-                                                onChange={(e) => setForm((prev) => ({ ...prev, motivo: e.target.value }))}
-                                                className="w-full appearance-none px-4 py-3 rounded-lg border border-gray-200 focus:border-gray-400 outline-none transition-colors text-sm text-gray-700 bg-white cursor-pointer"
-                                                autoFocus
-                                            >
-                                                <option value="">Selecione o motivo...</option>
-                                                <option value="Descarte">Descarte</option>
-                                                <option value="Desgaste">Desgaste</option>
-                                                <option value="Furto">Furto</option>
-                                                <option value="Roubo">Roubo</option>
-                                                <option value="Defeito">Defeito</option>
-                                            </select>
-                                            <div className="pointer-events-none absolute inset-y-0 right-3 flex items-center">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                                                    <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
-                                                </svg>
+
+                                <form onSubmit={handleValidarMotivos} className="space-y-6">
+                                    <div className="space-y-4 max-h-[450px] overflow-y-auto pr-2 custom-scrollbar">
+                                        {form.itensSelecionados.map((item) => (
+                                            <div key={item.id} className="p-5 border border-gray-100 rounded-xl bg-gray-50/30 group transition-all hover:border-gray-200">
+                                                <div className="flex items-center justify-between mb-3">
+                                                    <p className="text-sm font-bold text-gray-700">{item.materialNome}</p>
+                                                    <span className="text-[10px] text-gray-400 font-mono">ID: {item.materialId}</span>
+                                                </div>
+                                                <div className="relative">
+                                                    <select
+                                                        value={form.motivos[item.id] || ''}
+                                                        onChange={(e) => setForm(f => ({
+                                                            ...f,
+                                                            motivos: { ...f.motivos, [item.id]: e.target.value }
+                                                        }))}
+                                                        className="w-full appearance-none px-4 py-3 rounded-xl border border-gray-200 focus:border-gray-800 focus:ring-1 focus:ring-gray-800 outline-none transition-all text-sm text-gray-700 bg-white cursor-pointer"
+                                                        required
+                                                    >
+                                                        <option value="">Selecione o motivo...</option>
+                                                        <option value="Descarte">Descarte</option>
+                                                        <option value="Desgaste">Desgaste</option>
+                                                        <option value="Furto">Furto</option>
+                                                        <option value="Roubo">Roubo</option>
+                                                        <option value="Defeito">Defeito</option>
+                                                    </select>
+                                                    <div className="pointer-events-none absolute inset-y-0 right-4 flex items-center">
+                                                        <svg className="w-4 h-4 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                                    </div>
+                                                </div>
                                             </div>
-                                        </div>
+                                        ))}
                                     </div>
-                                    <div className="flex gap-3">
+
+                                    <div className="flex gap-4 pt-4 border-t border-gray-100">
                                         <button id="btn-voltar-step3" onClick={handleVoltar} type="button"
-                                            className="px-4 py-2.5 border border-gray-200 text-gray-600 text-sm font-medium rounded-lg hover:bg-gray-50 transition-colors">
-                                            ← Trocar Item
+                                            className="px-6 py-2.5 border border-gray-200 text-gray-600 text-sm font-semibold rounded-xl hover:bg-gray-50 transition-all active:scale-95 text-center">
+                                            ← Alterar Itens
                                         </button>
-                                        <button id="btn-confirmar-motivo" type="submit"
-                                            className="flex-1 bg-gray-800 text-white text-sm font-medium px-6 py-2.5 rounded-lg hover:bg-gray-900 transition-colors">
-                                            Revisar e Finalizar →
+                                        <button id="btn-confirmar-motivos" type="submit"
+                                            className="flex-1 bg-gray-800 text-white text-sm font-semibold px-6 py-2.5 rounded-xl hover:bg-gray-900 transition-all shadow-sm active:scale-95">
+                                            Revisar Solicitação →
                                         </button>
                                     </div>
                                 </form>
                             </div>
                         )}
 
-                        {/* STEP 4: Confirmação */}
+                        {/* STEP 4: Confirmação Final Múltipla */}
                         {step === 4 && (
-                            <div className="bg-white border border-gray-200 rounded-xl p-6 sm:p-8">
-                                <div className="flex items-center justify-between mb-6">
-                                    <h2 className="text-lg font-semibold text-gray-800">Resumo Final</h2>
-                                    <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-green-50 text-green-700 border border-green-200">Troca</span>
+                            <div className="bg-white border border-gray-200 rounded-2xl p-6 sm:p-8 shadow-sm">
+                                <div className="flex items-center justify-between mb-8">
+                                    <div>
+                                        <h2 className="text-lg font-bold text-gray-800">Resumo da Solicitação</h2>
+                                        <p className="text-sm text-gray-400">{form.itensSelecionados.length} itens para troca</p>
+                                    </div>
+                                    <span className="text-xs font-bold px-3 py-1.5 rounded-full bg-green-50 text-green-700 border border-green-200">
+                                        Lote de Trocas
+                                    </span>
                                 </div>
-                                <div className="grid sm:grid-cols-2 gap-4 mb-6">
-                                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Técnico</p>
-                                        <p className="text-sm font-semibold text-gray-800">{form.tecnicoValidado?.nome}</p>
+
+                                <div className="space-y-4 mb-8">
+                                    <div className="bg-gray-50 border border-gray-100 rounded-xl p-5">
+                                        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-2">Técnico Beneficiário</p>
+                                        <p className="text-sm font-bold text-gray-800">{form.tecnicoValidado?.nome}</p>
                                         <p className="text-xs text-gray-400 mt-0.5">{form.tecnicoValidado?.matricula} · {form.tecnicoValidado?.cargo}</p>
                                     </div>
-                                    <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
-                                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Item para Devolução</p>
-                                        <p className="text-sm font-semibold text-gray-800">{form.itemSaidaSelecionado?.materialNome}</p>
-                                        <p className="text-xs text-gray-400 mt-1">
-                                            Previsão D+1: {new Date(calcularPrazoD1(new Date().toISOString())).toLocaleDateString('pt-BR')}
-                                        </p>
-                                    </div>
-                                    <div className="sm:col-span-2 bg-gray-50 border border-gray-200 rounded-lg p-4">
-                                        <p className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-2">Motivo</p>
-                                        <p className="text-sm text-gray-700">{form.motivo}</p>
+
+                                    <div className="border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+                                        <div className="bg-gray-50 px-5 py-3 border-b border-gray-100">
+                                            <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest">Lista de Itens e Motivos</p>
+                                        </div>
+                                        <div className="divide-y divide-gray-50 max-h-60 overflow-y-auto custom-scrollbar">
+                                            {form.itensSelecionados.map(item => (
+                                                <div key={item.id} className="px-5 py-4 flex justify-between items-start gap-4 hover:bg-gray-50/50 transition-colors">
+                                                    <div>
+                                                        <p className="text-sm font-bold text-gray-800">{item.materialNome}</p>
+                                                        <p className="text-[10px] text-gray-400 mt-1">Prazo D+1: {new Date(calcularPrazoD1(new Date().toISOString())).toLocaleDateString('pt-BR')}</p>
+                                                    </div>
+                                                    <span className="text-xs font-semibold text-gray-600 bg-white px-3 py-1 rounded-lg border border-gray-200 shadow-sm">
+                                                        {form.motivos[item.id]}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
                                 </div>
-                                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
+
+                                <div className="flex items-center justify-between pt-6 border-t border-gray-100">
                                     <button id="btn-voltar-resumo" onClick={handleVoltar} type="button"
-                                        className="text-sm text-gray-400 hover:text-gray-700 transition-colors">
-                                        ← Corrigir Dados
+                                        className="text-sm font-semibold text-gray-400 hover:text-gray-700 transition-all">
+                                        ← Alterar Motivos
                                     </button>
                                     <button
-                                        id="btn-confirmar-troca"
+                                        id="btn-confirmar-lote"
                                         onClick={handleConfirmar}
                                         type="button"
                                         disabled={loading}
-                                        className="inline-flex items-center gap-2 bg-green-600 text-white text-sm font-medium px-6 py-2.5 rounded-lg hover:bg-green-700 transition-colors disabled:opacity-50"
+                                        className="inline-flex items-center gap-3 bg-green-600 text-white text-sm font-bold px-8 py-3 rounded-xl hover:bg-green-700 transition-all shadow-md active:scale-95 disabled:opacity-50"
                                     >
-                                        {loading ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <span>✓</span>}
-                                        Registrar Troca
+                                        {loading ? (
+                                            <span className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                                        ) : (
+                                            <span className="text-lg">✓</span>
+                                        )}
+                                        Finalizar Solicitação
                                     </button>
                                 </div>
                             </div>
