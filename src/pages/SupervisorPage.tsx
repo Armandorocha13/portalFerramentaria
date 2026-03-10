@@ -173,7 +173,7 @@ export default function SupervisorPage() {
                 setErro(`Técnico ${tecnico.nome} está com status: ${tecnico.status}. Apenas técnicos ativos realizam trocas.`);
                 return;
             }
-            const carga = await getCargaTecnico(tecnico.matricula);
+            const carga = await getCargaTecnico(tecnico.matricula, tecnico.nome);
             setCargaTecnico(carga);
             // Carregar trocas recentes (< 45 dias) para badges
             const recentes = await verificarTrocasRecentesBatch(tecnico.matricula);

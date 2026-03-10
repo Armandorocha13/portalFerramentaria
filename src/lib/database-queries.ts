@@ -147,11 +147,13 @@ const sanitizarValor = (val: any): number => {
 };
 
 /** 🛠️ Recupera a carga/saldo do técnico */
-export async function getCargaTecnico(tecnicoMatricula: string): Promise<ItemCarga[]> {
+export async function getCargaTecnico(tecnicoMatricula: string, tecnicoNome: string): Promise<ItemCarga[]> {
     const { data, error } = await supabase
         .from('carga_tecnicos')
         .select('*')
-        .eq('matricula_tecnico', tecnicoMatricula);
+        .eq('matricula_tecnico', tecnicoMatricula)
+        .ilike('nome_tecnico', `%${tecnicoNome}%`)
+        .order('descricao_material', { ascending: true });
 
     if (error || !data) return [];
 

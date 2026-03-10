@@ -57,7 +57,7 @@ export async function importCargaSaldo() {
     const setNomesValidos = new Set(tecsDb?.map(t => String(t.nome).trim().toUpperCase()) || []);
     console.log(`- ${setMatriculasValidas.size} técnicos encontrados para filtragem.`);
 
-    // 2. Carregar mapeamento de nomes -> matrículas do EQUIPES.xlsx (Fonte da Verdade)
+    // 2. Carregar mapeamento de nomes -> matrículas
     const wbEquipes = xlsx.readFile(path.resolve(__dirname, '..', 'BaseDeDados', 'EQUIPES.xlsx'));
     const dbEquipes = xlsx.utils.sheet_to_json(wbEquipes.Sheets['SINAPSE'], { header: 1, defval: '' }).slice(1);
     const mapGeralNomesMatriculas = new Map();
@@ -67,69 +67,96 @@ export async function importCargaSaldo() {
         if (nome) mapGeralNomesMatriculas.set(nome, matriculaCorreta);
     });
 
-    // 3. Ler ANIEL_Saldo Volante.xlsx
+    // 3. Ler Saldo Volante e DEDUPLICAR / SOMAR saldos
     const workbook = xlsx.readFile(filePath);
     const sheet = workbook.Sheets['SINAPSE'];
     const dataRows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' }).slice(5);
 
-    const cargaItems = [];
+    const mapDeduplicar = new Map();
 
     for (const r of dataRows as any[]) {
         const nomeTec = String(r[6] || '').trim();
         if (!nomeTec || nomeTec === 'Nome da Equipe') continue;
 
         const nomeUpper = nomeTec.toUpperCase();
-        const matriculaPlanilha = String(r[5] || '').trim();
-        const matriculaOficial = mapGeralNomesMatriculas.get(nomeUpper) || matriculaPlanilha;
+        const matriculaOficial = mapGeralNomesMatriculas.get(nomeUpper) || String(r[5] || '').trim();
 
-        // FILTRO: Só importa se o técnico existir no nosso banco
-        if (!setMatriculasValidas.has(matriculaOficial) && !setNomesValidos.has(nomeUpper)) {
-            continue;
+        if (!setMatriculasValidas.has(matriculaOficial) && !setNomesValidos.has(nomeUpper)) continue;
+
+        const codigoMat = String(r[8] || '').trim();
+        if (!codigoMat) continue;
+
+        const saldoStr = String(r[19] || '0').replace('.', '').replace(',', '.');
+        const saldoFloat = parseFloat(saldoStr) || 0;
+
+        // Se o saldo for 0, ignoramos
+        if (saldoFloat <= 0) continue;
+
+        const valorTotalStr = String(r[21] || '0').replace('.', '').replace(',', '.');
+        const valorTotal = parseFloat(valorTotalStr) || 0;
+        const valorUnitStr = String(r[20] || '0').replace('.', '').replace(',', '.');
+        const valorUnit = parseFloat(valorUnitStr) || 0;
+
+        // Chave única: Matrícula + Código do Material
+        const uniqueKey = `${matriculaOficial}_${codigoMat}`;
+
+        if (mapDeduplicar.has(uniqueKey)) {
+            const existing = mapDeduplicar.get(uniqueKey);
+            existing.saldo = (parseFloat(existing.saldo.replace(',', '.')) + saldoFloat).toFixed(2).replace('.', ',');
+            existing.valor_total = (parseFloat(existing.valor_total.replace(',', '.')) + valorTotal).toFixed(2).replace('.', ',');
+            // Valor unitário mantemos o do primeiro item ou média? Mantemos o primeiro.
+            existing.valor = valorUnit;
+        } else {
+            mapDeduplicar.set(uniqueKey, {
+                contrato_origem: String(r[0] || '').trim(),
+                matricula_tecnico: matriculaOficial,
+                nome_tecnico: nomeTec,
+                codigo_material: codigoMat,
+                descricao_material: String(r[9] || '').trim(),
+                unidade: String(r[12] || '').trim(),
+                saldo: saldoFloat.toFixed(2).replace('.', ','),
+                valor_total: valorTotal.toFixed(2).replace('.', ','),
+                valor: valorUnit
+            });
         }
-
-        cargaItems.push({
-            contrato_origem: String(r[0] || '').trim(),
-            matricula_tecnico: matriculaOficial,
-            nome_tecnico: nomeTec,
-            codigo_material: String(r[8] || '').trim(),
-            descricao_material: String(r[9] || '').trim(),
-            unidade: String(r[12] || '').trim(),
-            saldo: String(r[19] || '').trim(),
-            valor_total: String(r[21] || '').trim(),
-            valor: parseFloat(String(r[20] || '0').replace('.', '').replace(',', '.')) || 0
-        });
     }
+
+    const cargaItems = Array.from(mapDeduplicar.values());
 
     if (cargaItems.length === 0) {
-        throw new Error("Nenhum item de carga encontrado para os técnicos cadastrados no sistema.");
+        throw new Error("Nenhum item de carga válido encontrado.");
     }
 
-    console.log(`- ${cargaItems.length} itens filtrados e prontos para importação (de ${dataRows.length} totais).`);
+    console.log(`- ${cargaItems.length} itens únicos para importação.`);
 
-    // 4. Limpar tabela carga_tecnicos com retry
+    // 4. Limpar tabela carga_tecnicos (Garante que está vazia)
     console.log("Limpando tabela carga_tecnicos...");
-    await withRetry(async () => {
-        const { error: deleteError } = await supabase.from('carga_tecnicos').delete().not('id', 'is', null);
-        if (deleteError) throw deleteError;
-    });
+    let totalRemovido = 0;
+    while (true) {
+        const { count: currentCount } = await supabase.from('carga_tecnicos').select('*', { count: 'exact', head: true });
+        if (currentCount === 0) break;
 
-    // 5. Inserir novos itens em lotes com delay e retry
+        console.log(`- Removendo ${currentCount} registros existentes...`);
+        const { error: deleteError } = await supabase.from('carga_tecnicos').delete().not('id', 'is', null);
+        if (deleteError) {
+            console.log("  Aviso: Erro parcial na limpeza, tentando novamente...");
+            await new Promise(resolve => setTimeout(resolve, 500));
+        }
+    }
+
+    // 5. Inserir novos dados em lotes
     console.log("Inserindo novos dados...");
-    const batchSize = 300; // Reduzido para maior estabilidade
+    const batchSize = 200; // Batch menor para evitar timeouts
     for (let i = 0; i < cargaItems.length; i += batchSize) {
         const batch = cargaItems.slice(i, i + batchSize);
 
         await withRetry(async () => {
             const { error: insertError } = await supabase.from('carga_tecnicos').insert(batch);
-            if (insertError) {
-                console.error(`Erro ao inserir lote [${i}] de ${cargaItems.length}:`, insertError);
-                throw insertError;
-            }
+            if (insertError) throw insertError;
         });
 
-        // Pausa entre lotes
-        await new Promise(resolve => setTimeout(resolve, 200));
-        if (i % 3000 === 0 && i > 0) console.log(`  ... processados ${i} itens`);
+        await new Promise(resolve => setTimeout(resolve, 250)); // Delay maior
+        if (i % 2000 === 0 && i > 0) console.log(`  ... processados ${i} itens`);
     }
 
     console.log("Carga atualizada com sucesso!");
