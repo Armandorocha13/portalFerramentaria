@@ -110,6 +110,7 @@ export default function SupervisorPage() {
     const [totalHistorico, setTotalHistorico] = useState(0);
     const [historicoPagina, setHistoricoPagina] = useState(1);
     const [notificacao, setNotificacao] = useState<{ id: string; texto: string } | null>(null);
+    const [filtroItem, setFiltroItem] = useState('');
 
     // ── Trava de 45 dias ──
     const [trocasRecentes, setTrocasRecentes] = useState<Map<string, ResultadoTrocaRecente>>(new Map());
@@ -480,47 +481,76 @@ export default function SupervisorPage() {
                                     </div>
                                 )}
 
+                                {/* Campo de Busca */}
+                                <div className="mb-4 relative">
+                                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                    </div>
+                                    <input
+                                        type="text"
+                                        placeholder="Buscar item pelo nome ou código..."
+                                        value={filtroItem}
+                                        onChange={(e) => setFiltroItem(e.target.value)}
+                                        className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-lg text-sm focus:outline-none focus:border-gray-400 transition-colors"
+                                    />
+                                    {filtroItem && (
+                                        <button
+                                            onClick={() => setFiltroItem('')}
+                                            className="absolute inset-y-0 right-3 flex items-center text-gray-400 hover:text-gray-600"
+                                        >
+                                            &times;
+                                        </button>
+                                    )}
+                                </div>
+
                                 {cargaTecnico.length === 0 ? (
                                     <div className="border-2 border-dashed border-gray-200 rounded-lg py-10 text-center">
                                         <p className="text-sm text-gray-400">Nenhum material em carga para este técnico</p>
                                     </div>
                                 ) : (
-                                    <div className="space-y-2 max-h-96 overflow-y-auto">
-                                        {cargaTecnico.map((item) => {
-                                            const bloqueio = trocasRecentes.get(item.materialNome);
-                                            const estaBloqueado = bloqueio && bloqueio.bloqueado;
-                                            const diasPassados = bloqueio ? 45 - bloqueio.diasRestantes : 0;
-                                            return (
-                                                <button
-                                                    key={item.id}
-                                                    id={`btn-item-saida-${item.id}`}
-                                                    onClick={() => handleSelecionarItemSaida(item)}
-                                                    type="button"
-                                                    className={`w-full text-left p-4 rounded-lg border transition-all flex items-center justify-between group ${estaBloqueado
-                                                        ? 'border-gray-300 bg-gray-50 opacity-75'
-                                                        : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
-                                                        }`}
-                                                >
-                                                    <div className="min-w-0 flex-1">
-                                                        <div className="flex items-center gap-2 flex-wrap">
-                                                            <p className={`text-sm font-semibold ${estaBloqueado ? 'text-gray-400' : 'text-gray-800'}`}>{item.materialNome}</p>
-                                                            {estaBloqueado && (
-                                                                <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 whitespace-nowrap">
-                                                                    🔒 Trocado há {diasPassados} dia{diasPassados !== 1 ? 's' : ''}
-                                                                </span>
-                                                            )}
+                                    <div className="space-y-2 max-h-96 overflow-y-auto pr-1">
+                                        {cargaTecnico
+                                            .filter(item =>
+                                                item.materialNome.toLowerCase().includes(filtroItem.toLowerCase()) ||
+                                                item.materialId.toString().includes(filtroItem)
+                                            )
+                                            .map((item) => {
+                                                const bloqueio = trocasRecentes.get(item.materialNome);
+                                                const estaBloqueado = bloqueio && bloqueio.bloqueado;
+                                                const diasPassados = bloqueio ? 45 - bloqueio.diasRestantes : 0;
+                                                return (
+                                                    <button
+                                                        key={item.id}
+                                                        id={`btn-item-saida-${item.id}`}
+                                                        onClick={() => handleSelecionarItemSaida(item)}
+                                                        type="button"
+                                                        className={`w-full text-left p-4 rounded-lg border transition-all flex items-center justify-between group ${estaBloqueado
+                                                            ? 'border-gray-300 bg-gray-50 opacity-75'
+                                                            : 'border-gray-200 hover:border-gray-400 hover:bg-gray-50'
+                                                            }`}
+                                                    >
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <p className={`text-sm font-semibold ${estaBloqueado ? 'text-gray-400' : 'text-gray-800'}`}>{item.materialNome}</p>
+                                                                {estaBloqueado && (
+                                                                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-gray-100 text-gray-500 border border-gray-200 whitespace-nowrap">
+                                                                        🔒 Trocado há {diasPassados} dia{diasPassados !== 1 ? 's' : ''}
+                                                                    </span>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
+                                                                <p className="text-xs text-gray-400">Qtd: <span className="text-gray-600">{item.quantidade}</span></p>
+                                                                <p className="text-xs text-gray-400">Data: <span className="text-gray-600">{new Date(item.dataAtribuicao).toLocaleDateString('pt-BR')}</span></p>
+                                                                {item.patrimonio && <p className="text-xs text-gray-400">Patr: <span className="text-gray-600">{item.patrimonio}</span></p>}
+                                                            </div>
                                                         </div>
-                                                        <div className="flex flex-wrap gap-x-4 gap-y-0.5 mt-1">
-                                                            <p className="text-xs text-gray-400">Qtd: <span className="text-gray-600">{item.quantidade}</span></p>
-                                                            <p className="text-xs text-gray-400">Data: <span className="text-gray-600">{new Date(item.dataAtribuicao).toLocaleDateString('pt-BR')}</span></p>
-                                                            {item.patrimonio && <p className="text-xs text-gray-400">Patr: <span className="text-gray-600">{item.patrimonio}</span></p>}
-                                                        </div>
-                                                    </div>
-                                                    <span className={`transition-colors text-lg shrink-0 ml-2 ${estaBloqueado ? 'text-gray-300' : 'text-gray-300 group-hover:text-gray-600'
-                                                        }`}>{estaBloqueado ? '🔒' : '→'}</span>
-                                                </button>
-                                            );
-                                        })}
+                                                        <span className={`transition-colors text-lg shrink-0 ml-2 ${estaBloqueado ? 'text-gray-300' : 'text-gray-300 group-hover:text-gray-600'
+                                                            }`}>{estaBloqueado ? '🔒' : '→'}</span>
+                                                    </button>
+                                                );
+                                            })}
                                     </div>
                                 )}
                                 <div className="mt-6 pt-4 border-t border-gray-100">
