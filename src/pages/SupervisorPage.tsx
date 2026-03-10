@@ -112,6 +112,15 @@ export default function SupervisorPage() {
     const [notificacao, setNotificacao] = useState<{ id: string; texto: string } | null>(null);
     const [filtroItem, setFiltroItem] = useState('');
 
+    // ---- Alterar Senha ----
+    const [showSenha, setShowSenha] = useState(false);
+    const [senhaAtual, setSenhaAtual] = useState('');
+    const [senhaNova, setSenhaNova] = useState('');
+    const [senhaConfirm, setSenhaConfirm] = useState('');
+    const [salvandoSenha, setSalvandoSenha] = useState(false);
+    const [senhaErro, setSenhaErro] = useState('');
+    const [senhaSucesso, setSenhaSucesso] = useState('');
+
     // ── Trava de 45 dias ──
     const [trocasRecentes, setTrocasRecentes] = useState<Map<string, ResultadoTrocaRecente>>(new Map());
     const [itemBloqueadoAlerta, setItemBloqueadoAlerta] = useState<ResultadoTrocaRecente | null>(null);
@@ -266,6 +275,40 @@ export default function SupervisorPage() {
         setStep((prev) => Math.max(0, prev - 1));
     }
 
+    async function handleAlterarSenha(e: React.FormEvent) {
+        e.preventDefault();
+        setSenhaErro('');
+        setSenhaSucesso('');
+        if (senhaNova.length < 4) { setSenhaErro('A nova senha deve ter ao menos 4 caracteres.'); return; }
+        if (senhaNova !== senhaConfirm) { setSenhaErro('As senhas não coincidem.'); return; }
+        setSalvandoSenha(true);
+        try {
+            const { data: supervisorData } = await supabase
+                .from('supervisores')
+                .select('matricula')
+                .eq('matricula', usuario?.matricula)
+                .eq('senha', senhaAtual)
+                .single();
+
+            if (!supervisorData) { setSenhaErro('Senha atual incorreta.'); return; }
+
+            const { error } = await supabase
+                .from('supervisores')
+                .update({ senha: senhaNova })
+                .eq('matricula', usuario?.matricula);
+
+            if (error) throw error;
+
+            setSenhaSucesso('Senha alterada com sucesso!');
+            setSenhaAtual(''); setSenhaNova(''); setSenhaConfirm('');
+            setTimeout(() => { setSenhaSucesso(''); setShowSenha(false); }, 2000);
+        } catch {
+            setSenhaErro('Erro ao alterar senha.');
+        } finally {
+            setSalvandoSenha(false);
+        }
+    }
+
     // ---- RENDER ----
     return (
         <div className="min-h-screen bg-gray-50">
@@ -283,15 +326,64 @@ export default function SupervisorPage() {
                             <p className="text-xs text-gray-400">{usuario?.nome.split(' ')[0]} · {usuario?.setor}</p>
                         </div>
                     </div>
-                    <button
-                        id="btn-logout"
-                        onClick={logout}
-                        className="text-xs text-gray-500 hover:text-gray-800 font-medium border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors"
-                    >
-                        Sair
-                    </button>
+                    <div className="flex items-center gap-2">
+                        <button
+                            onClick={() => setShowSenha(true)}
+                            title="Alterar minha senha"
+                            className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                            </svg>
+                        </button>
+                        <button
+                            id="btn-logout"
+                            onClick={logout}
+                            className="text-xs text-gray-500 hover:text-gray-800 font-medium border border-gray-200 rounded-lg px-3 py-1.5 hover:bg-gray-50 transition-colors"
+                        >
+                            Sair
+                        </button>
+                    </div>
                 </div>
             </header>
+
+            {/* Modal Alterar Senha */}
+            {showSenha && (
+                <div className="fixed inset-0 z-[200] flex items-center justify-center px-4 bg-black/40 backdrop-blur-sm">
+                    <div className="bg-white rounded-xl shadow-xl w-full max-w-sm p-6">
+                        <div className="flex items-center justify-between mb-5">
+                            <h2 className="text-base font-semibold text-gray-800">Minha Segurança</h2>
+                            <button onClick={() => { setShowSenha(false); setSenhaErro(''); setSenhaSucesso(''); }} className="text-gray-400 hover:text-gray-600 text-xl leading-none">&times;</button>
+                        </div>
+                        <p className="text-xs text-gray-400 mb-6">Mantenha sua conta protegida alterando sua senha periodicamente.</p>
+                        <form onSubmit={handleAlterarSenha} className="space-y-4">
+                            <div>
+                                <label className="block text-xs font-medium text-gray-500 mb-1">Senha Atual</label>
+                                <input type="password" value={senhaAtual} onChange={e => setSenhaAtual(e.target.value)} required
+                                    className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-800 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-200" />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Nova Senha</label>
+                                    <input type="password" value={senhaNova} onChange={e => setSenhaNova(e.target.value)} required
+                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-800 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-200" />
+                                </div>
+                                <div>
+                                    <label className="block text-xs font-medium text-gray-500 mb-1">Confirmar</label>
+                                    <input type="password" value={senhaConfirm} onChange={e => setSenhaConfirm(e.target.value)} required
+                                        className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm text-gray-800 focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-200" />
+                                </div>
+                            </div>
+                            {senhaErro && <p className="text-xs text-red-600 bg-red-50 border border-red-100 rounded-lg px-3 py-2">{senhaErro}</p>}
+                            {senhaSucesso && <p className="text-xs text-green-600 bg-green-50 border border-green-100 rounded-lg px-3 py-2">{senhaSucesso}</p>}
+                            <button type="submit" disabled={salvandoSenha}
+                                className="w-full bg-gray-800 text-white text-sm font-medium py-2.5 rounded-lg hover:bg-gray-900 transition-colors disabled:opacity-50 mt-2">
+                                {salvandoSenha ? 'Salvando...' : 'Atualizar Minha Senha'}
+                            </button>
+                        </form>
+                    </div>
+                </div>
+            )}
 
             {/* Toast notificação Realtime */}
             {notificacao && (
