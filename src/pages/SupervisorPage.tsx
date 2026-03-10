@@ -8,7 +8,7 @@ import { useAuth } from '../context/AuthContext';
 import { useSolicitacoes } from '../context/SolicitacoesContext';
 import { getTecnico, getCargaTecnico, registrarTroca, getHistoricoTrocas, verificarTrocasRecentesBatch, type ResultadoTrocaRecente } from '../lib/database-queries';
 import { supabase } from '../lib/supabase';
-import { calcularPrazoD1 } from '../mocks/database';
+import { calcularPrazoD1, calcularPrazo } from '../mocks/database';
 import type { ItemCarga, FormularioTroca } from '../types';
 
 const STEPS = ['Identificação', 'Validação', 'Selecione o item', 'Motivo', 'Confirmação'] as const;
@@ -49,7 +49,9 @@ function PrazoRetirada({ dataLiberacao }: { dataLiberacao: string }) {
         return () => clearInterval(t);
     }, []);
 
-    const prazo = new Date(dataLiberacao).getTime() + 24 * 60 * 60 * 1000;
+    const isPosCutoff = new Date(dataLiberacao).getHours() >= 15;
+    const additionalHours = isPosCutoff ? 48 : 24;
+    const prazo = new Date(dataLiberacao).getTime() + additionalHours * 60 * 60 * 1000;
     const diffMs = prazo - agora;
 
     if (diffMs <= 0) {
@@ -196,8 +198,11 @@ export default function SupervisorPage() {
             setForm((prev) => ({ ...prev, tecnicoValidado: tecnico }));
             setStep(1);
 
-            // Verificar Horário de Corte (Forçado para teste)
-            setShowCutoffAlert(true);
+            // Verificar Horário de Corte (15:00)
+            const horaAtual = new Date().getHours();
+            if (horaAtual >= 15) {
+                setShowCutoffAlert(true);
+            }
         } catch (err: any) {
             setErro(err.message || 'Erro ao consultar técnico.');
         } finally {
@@ -268,8 +273,10 @@ export default function SupervisorPage() {
 
             await Promise.all(promessas);
 
-            const agora = new Date().toISOString().split('T')[0];
-            const prazo = calcularPrazoD1(agora);
+            const agoraFull = new Date();
+            const agoraData = agoraFull.toISOString().split('T')[0];
+            const isPosCutoff = agoraFull.getHours() >= 15;
+            const prazo = calcularPrazo(agoraData, isPosCutoff ? 2 : 1);
 
             form.itensSelecionados.forEach((item: ItemCarga) => {
                 adicionarSolicitacao({
@@ -282,7 +289,7 @@ export default function SupervisorPage() {
                     materialEntradaId: item.materialId,
                     materialEntradaNome: item.materialNome,
                     motivo: form.motivos[item.id],
-                    dataSolicitacao: agora,
+                    dataSolicitacao: agoraData,
                     prazoResolucao: prazo,
                     status: 'pendente',
                 });
@@ -818,7 +825,9 @@ export default function SupervisorPage() {
                                                 <div key={item.id} className="px-5 py-4 flex justify-between items-start gap-4 hover:bg-gray-50/50 transition-colors">
                                                     <div>
                                                         <p className="text-sm font-bold text-gray-800">{item.materialNome}</p>
-                                                        <p className="text-[10px] text-gray-400 mt-1">Prazo D+1: {new Date(calcularPrazoD1(new Date().toISOString())).toLocaleDateString('pt-BR')}</p>
+                                                        <p className="text-[10px] text-gray-400 mt-1">
+                                                            Prazo {new Date().getHours() >= 15 ? 'D+2' : 'D+1'}: {new Date(calcularPrazo(new Date().toISOString(), new Date().getHours() >= 15 ? 2 : 1)).toLocaleDateString('pt-BR')}
+                                                        </p>
                                                     </div>
                                                     <span className="text-xs font-semibold text-gray-600 bg-white px-3 py-1 rounded-lg border border-gray-200 shadow-sm">
                                                         {form.motivos[item.id]}

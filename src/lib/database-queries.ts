@@ -1,5 +1,6 @@
 import { supabase } from './supabase';
 import type { Tecnico, ItemCarga, Material } from '../types';
+import { calcularPrazo } from './date-utils';
 
 // ============================================================
 // REGRA DE NEGÓCIO: Trava de 45 dias
@@ -269,7 +270,7 @@ export async function getHistoricoTrocas(supervisorId: string, page = 1, pageSiz
             itemSaidaNome: item.item_saida_nome,
             materialEntradaNome: item.item_entrada_nome,
             dataSolicitacao: item.data_troca,
-            prazoResolucao: item.data_troca, // Simplificado, ideal calcular D+1 se necessário
+            prazoResolucao: calcularPrazo(item.data_troca, new Date(item.data_troca).getHours() >= 15 ? 2 : 1),
             status: item.status || 'pedido_em_andamento',
         })),
         count: count || 0

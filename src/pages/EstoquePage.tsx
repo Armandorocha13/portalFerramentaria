@@ -96,7 +96,10 @@ function PrazoRetirada({ dataLiberacao }: { dataLiberacao: string }) {
         return () => clearInterval(t);
     }, []);
 
-    const prazo = new Date(dataLiberacao).getTime() + LIMITE_RETIRADA_MS;
+    const isPosCutoff = new Date(dataLiberacao).getHours() >= 15;
+    const additionalHours = isPosCutoff ? 48 : 24;
+    const limitMs = additionalHours * 60 * 60 * 1000;
+    const prazo = new Date(dataLiberacao).getTime() + limitMs;
     const diffMs = prazo - agora;
 
     if (diffMs <= 0) {
@@ -735,10 +738,12 @@ export default function EstoquePage() {
         try {
             const data = await getTrocasSupabase();
             const agora = Date.now();
-            const expirados = data.filter(
-                (t) => t.status === 'liberado_retirada' && !t.prazo_expirado &&
-                    (agora - new Date(t.data_troca).getTime() > LIMITE_RETIRADA_MS)
-            );
+            const expirados = data.filter((t) => {
+                if (t.status !== 'liberado_retirada' || t.prazo_expirado) return false;
+                const isPosCutoff = new Date(t.data_troca).getHours() >= 15;
+                const limitMs = (isPosCutoff ? 48 : 24) * 60 * 60 * 1000;
+                return (agora - new Date(t.data_troca).getTime() > limitMs);
+            });
             if (expirados.length > 0) {
                 await Promise.all(expirados.map((t) => atualizarStatusSupabase(t.id, 'retirado', true)));
                 const idsExpirados = new Set(expirados.map((t) => t.id));
