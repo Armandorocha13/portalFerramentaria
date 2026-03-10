@@ -661,7 +661,7 @@ function SlaKpiPanel({ trocas }: { trocas: Troca[] }) {
                 <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
                     <p className="text-[9px] sm:text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 sm:mb-2 text-gray-400">Atendidos Hoje</p>
                     <p className="text-lg sm:text-xl font-bold text-gray-800">{metricas.atendidosHoje}</p>
-                    <p className="hidden sm:block text-xs text-gray-400 mt-0.5">Pedidos finalizados hoje</p>
+                    <p className="hidden sm:block text-xs text-gray-400 mt-0.5">Pedidos atendidos hoje</p>
                 </div>
                 {/* Prazos expirados */}
                 <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
