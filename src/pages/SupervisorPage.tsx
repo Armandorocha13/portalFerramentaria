@@ -125,7 +125,7 @@ export default function SupervisorPage() {
     const [trocasRecentes, setTrocasRecentes] = useState<Map<string, ResultadoTrocaRecente>>(new Map());
     const [itemBloqueadoAlerta, setItemBloqueadoAlerta] = useState<ResultadoTrocaRecente | null>(null);
 
-    const fetchHistorico = useCallback(async (page = historicoPagina) => {
+    const fetchHistorico = useCallback(async (page: number) => {
         if (!usuario?.id) return;
         setLoading(true);
         try {
@@ -133,13 +133,18 @@ export default function SupervisorPage() {
             setHistoricoSupabase(data);
             setTotalHistorico(count);
             setHistoricoPagina(page);
+        } catch (err) {
+            console.error('Erro ao buscar histórico:', err);
         } finally {
             setLoading(false);
         }
-    }, [usuario, historicoPagina]);
+    }, [usuario?.id]);
 
     useEffect(() => {
-        if (tabAtiva === 'historico') fetchHistorico();
+        if (tabAtiva === 'historico') {
+            fetchHistorico(historicoPagina);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [tabAtiva, fetchHistorico]);
 
     // Supabase Realtime
