@@ -307,12 +307,16 @@ function TrocasList({
     atualizando,
     onAtualizarStatus,
     todosOsDados,
+    onUpdateCarga,
+    isUpdatingCarga,
 }: {
     trocas: Troca[];
     tabAtiva: 'fila' | 'liberados' | 'sem_estoque' | 'finalizados';
     atualizando: string | null;
     onAtualizarStatus: (id: string, status: StatusEstoque, expirado?: boolean) => void;
     todosOsDados: Troca[];
+    onUpdateCarga: () => void;
+    isUpdatingCarga: boolean;
 }) {
     const [busca, setBusca] = useState('');
     const debouncedBusca = useDebounce(busca, 300);
@@ -501,12 +505,23 @@ function TrocasList({
                         <button
                             onClick={exportarXLSX}
                             disabled={todosOsDados.length === 0}
-                            className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2 bg-gray-800 text-white rounded-md hover:bg-gray-900 transition-all disabled:opacity-40 shadow-sm"
+                            className="flex-1 lg:flex-none flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 transition-all disabled:opacity-40"
                         >
                             <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
                                 <path strokeLinecap="round" strokeLinejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                             </svg>
                             Exportar Excel
+                        </button>
+                        <button
+                            onClick={onUpdateCarga}
+                            disabled={isUpdatingCarga}
+                            className={`flex-1 lg:flex-none flex items-center justify-center gap-1.5 text-xs font-semibold px-4 py-2 rounded-md transition-all shadow-sm ${isUpdatingCarga ? 'bg-amber-100 text-amber-700' : 'bg-amber-600 text-white hover:bg-amber-700'
+                                }`}
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className={`w-3.5 h-3.5 ${isUpdatingCarga ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                            </svg>
+                            {isUpdatingCarga ? 'Sincronizando...' : 'Atualizar Carga (Excel)'}
                         </button>
                     </div>
                 </div>
@@ -713,6 +728,7 @@ export default function EstoquePage() {
     const [senhaErro, setSenhaErro] = useState('');
     const [senhaSucesso, setSenhaSucesso] = useState('');
     const [salvandoSenha, setSalvandoSenha] = useState(false);
+    const [atualizandoCarga, setAtualizandoCarga] = useState(false);
 
     const fetchTrocas = useCallback(async () => {
         setLoading(true);
@@ -836,6 +852,28 @@ export default function EstoquePage() {
             setSenhaErro('Erro ao alterar senha.');
         } finally {
             setSalvandoSenha(false);
+        }
+    }
+
+    async function handleAtualizarCarga() {
+        if (!confirm('Deseja atualizar a carga de dados agora? Isso removerá a carga atual e importará os dados do arquivo Saldo Volante.')) return;
+        setAtualizandoCarga(true);
+        setErro('');
+        setSucesso('');
+        try {
+            const res = await fetch('/api/update-carga');
+            const data = await res.json();
+            if (res.ok) {
+                setSucesso(`Carga atualizada com sucesso! ${data.count} itens importados.`);
+                setTimeout(() => setSucesso(''), 5000);
+            } else {
+                throw new Error(data.error || 'Erro na atualização');
+            }
+        } catch (err: any) {
+            setErro('Erro ao atualizar carga: ' + err.message);
+            setTimeout(() => setErro(''), 8000);
+        } finally {
+            setAtualizandoCarga(false);
         }
     }
 
@@ -1009,6 +1047,8 @@ export default function EstoquePage() {
                         atualizando={atualizando}
                         onAtualizarStatus={handleAtualizarStatus}
                         todosOsDados={trocas}
+                        onUpdateCarga={handleAtualizarCarga}
+                        isUpdatingCarga={atualizandoCarga}
                     />
                 )}
             </main>
