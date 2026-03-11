@@ -2,7 +2,7 @@
 // MOCK DATABASE — Sistema de Gestão de Trocas
 // ============================================================
 
-import type { Usuario, Supervisor, Tecnico, ItemCarga, Material } from '../types';
+import type { Usuario, Supervisor, Tecnico, ItemCarga, Material } from '../tipos';
 
 // ---- USUÁRIOS DO SISTEMA (login unificado por matrícula) ----
 const usuarios: Usuario[] = [

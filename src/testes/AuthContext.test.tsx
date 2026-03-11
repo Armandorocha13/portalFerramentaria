@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { renderHook, act } from '@testing-library/react';
-import { AuthProvider, useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
+import { AuthProvider, useAuth } from '../contextos/AuthContext';
+import { supabase } from '../bibliotecas/supabase';
 
 // Mock do módulo do Supabase para não conectar no banco real durante os testes
 vi.mock('../lib/supabase', () => ({

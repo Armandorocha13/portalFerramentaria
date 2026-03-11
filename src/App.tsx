@@ -3,13 +3,13 @@
 // ============================================================
 
 import { Suspense, lazy } from 'react';
-import { AuthProvider, useAuth } from './context/AuthContext';
-import { SolicitacoesProvider } from './context/SolicitacoesContext';
+import { AuthProvider, useAuth } from './contextos/AuthContext';
+import { SolicitacoesProvider } from './contextos/SolicitacoesContext';
 
 // Importação assíncrona para que os pedaços de JS (chunks) só sejam baixados na hora de usar
-const LoginPage = lazy(() => import('./pages/LoginPage'));
-const SupervisorPage = lazy(() => import('./pages/SupervisorPage'));
-const EstoquePage = lazy(() => import('./pages/EstoquePage'));
+const LoginPage = lazy(() => import('./paginas/LoginPage'));
+const SupervisorPage = lazy(() => import('./paginas/SupervisorPage'));
+const EstoquePage = lazy(() => import('./paginas/EstoquePage'));
 
 // Loader bonitão pro usuário enquanto a página tá sendo lixada via Lazy Loading
 const PageLoader = () => (

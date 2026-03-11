@@ -4,12 +4,12 @@
 // ============================================================
 
 import { useState, useEffect, useCallback, type FormEvent } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { useSolicitacoes } from '../context/SolicitacoesContext';
-import { getTecnico, getCargaTecnico, registrarTroca, getHistoricoTrocas, verificarTrocasRecentesBatch, type ResultadoTrocaRecente } from '../lib/database-queries';
-import { supabase } from '../lib/supabase';
-import { calcularPrazoD1, calcularPrazo } from '../mocks/database';
-import type { ItemCarga, FormularioTroca } from '../types';
+import { useAuth } from '../contextos/AuthContext';
+import { useSolicitacoes } from '../contextos/SolicitacoesContext';
+import { getTecnico, getCargaTecnico, registrarTroca, getHistoricoTrocas, verificarTrocasRecentesBatch, type ResultadoTrocaRecente } from '../bibliotecas/database-queries';
+import { supabase } from '../bibliotecas/supabase';
+import { calcularPrazoD1, calcularPrazo } from '../simulacoes/database';
+import type { ItemCarga, FormularioTroca } from '../tipos';
 
 const STEPS = ['Identificação', 'Validação', 'Selecione o item', 'Motivo', 'Confirmação'] as const;
 

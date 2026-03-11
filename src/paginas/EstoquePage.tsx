@@ -4,9 +4,9 @@
 // ============================================================
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import { useAuth } from '../context/AuthContext';
-import { supabase } from '../lib/supabase';
-import { useDebounce } from '../hooks/useDebounce';
+import { useAuth } from '../contextos/AuthContext';
+import { supabase } from '../bibliotecas/supabase';
+import { useDebounce } from '../ganchos/useDebounce';
 
 type StatusEstoque = 'pedido_em_andamento' | 'sem_estoque' | 'liberado_retirada' | 'retirado';
 

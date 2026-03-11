@@ -6,18 +6,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import SupervisorPage from '../pages/SupervisorPage';
-import type { ResultadoTrocaRecente } from '../lib/database-queries';
+import SupervisorPage from '../paginas/SupervisorPage';
+import type { ResultadoTrocaRecente } from '../bibliotecas/database-queries';
+import { verificarTrocaRecente, verificarTrocasRecentesBatch } from '../bibliotecas/database-queries';
+import { supabase } from '../bibliotecas/supabase';
 
 // ---- Mocks ----
-vi.mock('../context/AuthContext', () => ({
+vi.mock('../contextos/AuthContext', () => ({
     useAuth: () => ({
         usuario: { id: 'mock-sup-id', matricula: 'SUP001', nome: 'Supervisor Teste', perfil: 'supervisor', setor: 'Teste' },
         logout: vi.fn(),
     }),
 }));
 
-vi.mock('../context/SolicitacoesContext', () => ({
+vi.mock('../contextos/SolicitacoesContext', () => ({
     useSolicitacoes: () => ({
         adicionarSolicitacao: vi.fn().mockReturnValue({ id: 'NEW_ID_456' }),
     }),
@@ -29,7 +31,7 @@ const mockRegistrarTroca = vi.hoisted(() => vi.fn());
 const mockGetHistoricoTrocas = vi.hoisted(() => vi.fn().mockResolvedValue({ data: [], count: 0 }));
 const mockVerificarTrocasRecentesBatch = vi.hoisted(() => vi.fn());
 
-vi.mock('../lib/database-queries', () => ({
+vi.mock('../bibliotecas/database-queries', () => ({
     getTecnico: mockGetTecnico,
     getCargaTecnico: mockGetCargaTecnico,
     registrarTroca: mockRegistrarTroca,
@@ -37,7 +39,7 @@ vi.mock('../lib/database-queries', () => ({
     verificarTrocasRecentesBatch: mockVerificarTrocasRecentesBatch,
 }));
 
-vi.mock('../lib/supabase', () => ({
+vi.mock('../bibliotecas/supabase', () => ({
     supabase: {
         channel: vi.fn().mockReturnValue({
             on: vi.fn().mockReturnThis(),

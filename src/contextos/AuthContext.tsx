@@ -4,8 +4,8 @@
 // ============================================================
 
 import { createContext, useContext, useState, useCallback, useEffect, useRef, type ReactNode } from 'react';
-import type { Usuario, UserPerfil } from '../types';
-import { supabase } from '../lib/supabase';
+import type { Usuario, UserPerfil } from '../tipos';
+import { supabase } from '../bibliotecas/supabase';
 
 // ---- Configurações de segurança ----
 const MAX_TENTATIVAS = 5;           // Tentativas antes de bloquear

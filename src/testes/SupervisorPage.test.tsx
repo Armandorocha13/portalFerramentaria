@@ -1,17 +1,21 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import SupervisorPage from './SupervisorPage';
+import SupervisorPage from '../paginas/SupervisorPage';
+import { AuthProvider } from '../contextos/AuthContext';
+import { SolicitacoesProvider } from '../contextos/SolicitacoesContext';
+import * as dbQueries from '../bibliotecas/database-queries';
+import { calcularPrazo } from '../simulacoes/database';
 
 // 1. Mock de Auth e dependências de Context
-vi.mock('../context/AuthContext', () => ({
+vi.mock('../contextos/AuthContext', () => ({
     useAuth: () => ({
         usuario: { id: 'mock-id-123', matricula: 'SUP001', nome: 'Supervisor Teste', perfil: 'supervisor' },
         logout: vi.fn(),
     }),
 }));
 
-vi.mock('../context/SolicitacoesContext', () => ({
+vi.mock('../contextos/SolicitacoesContext', () => ({
     useSolicitacoes: () => ({
         adicionarSolicitacao: vi.fn().mockReturnValue({ id: 'NEW_ID_123' }),
     }),
@@ -24,7 +28,7 @@ const mockRegistrarTroca = vi.hoisted(() => vi.fn());
 const mockGetHistoricoTrocas = vi.hoisted(() => vi.fn().mockResolvedValue({ data: [], count: 0 }));
 const mockVerificarTrocasRecentesBatch = vi.hoisted(() => vi.fn().mockResolvedValue(new Map()));
 
-vi.mock('../lib/database-queries', () => ({
+vi.mock('../bibliotecas/database-queries', () => ({
     getTecnico: mockGetTecnico,
     getCargaTecnico: mockGetCargaTecnico,
     registrarTroca: mockRegistrarTroca,
@@ -33,7 +37,7 @@ vi.mock('../lib/database-queries', () => ({
 }));
 
 // 3. Mock do Supabase Client para contornar problemas de realtime WebSocket
-vi.mock('../lib/supabase', () => ({
+vi.mock('../bibliotecas/supabase', () => ({
     supabase: {
         channel: vi.fn().mockReturnValue({
             on: vi.fn().mockReturnThis(),

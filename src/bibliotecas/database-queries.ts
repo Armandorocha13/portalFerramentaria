@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import type { Tecnico, ItemCarga, Material } from '../types';
+import type { Tecnico, ItemCarga, Material } from '../tipos';
 import { calcularPrazo } from './date-utils';
 
 // ============================================================
