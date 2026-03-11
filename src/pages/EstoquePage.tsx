@@ -592,7 +592,7 @@ function TrocasList({
 }
 
 // ---- Painel SLA e Métricas ----
-function SlaKpiPanel({ trocas }: { trocas: Troca[] }) {
+function SlaKpiPanel({ trocas, onCliqueExpirados }: { trocas: Troca[]; onCliqueExpirados?: () => void }) {
     const [mostrarOperadores, setMostrarOperadores] = useState(false);
 
     const metricas = useMemo(() => {
@@ -633,10 +633,11 @@ function SlaKpiPanel({ trocas }: { trocas: Troca[] }) {
 
         // 3. Prazos expirados no mês
         const inicioMes = new Date(agora.getFullYear(), agora.getMonth(), 1);
-        const expiradosMes = trocas.filter(t =>
+        const expiradosLista = trocas.filter(t =>
             t.prazo_expirado &&
             new Date(t.data_troca) >= inicioMes
-        ).length;
+        );
+        const expiradosMes = expiradosLista.length;
 
         // 4. Atendimentos por operador (últimos 30 dias)
         const porOperador = new Map<string, number>();
@@ -648,7 +649,7 @@ function SlaKpiPanel({ trocas }: { trocas: Troca[] }) {
         const operadores = Array.from(porOperador.entries())
             .sort((a, b) => b[1] - a[1]);
 
-        return { slaFormatado, atendidosHoje, expiradosMes, operadores, totalOperadores: operadores.length };
+        return { slaFormatado, atendidosHoje, expiradosMes, expiradosLista, operadores, totalOperadores: operadores.length };
     }, [trocas]);
 
     return (
@@ -667,9 +668,17 @@ function SlaKpiPanel({ trocas }: { trocas: Troca[] }) {
                     <p className="hidden sm:block text-xs text-gray-400 mt-0.5">Pedidos atendidos hoje</p>
                 </div>
                 {/* Prazos expirados */}
-                <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
+                <div
+                    onClick={onCliqueExpirados}
+                    className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 relative cursor-pointer hover:border-orange-300 transition-colors group"
+                >
                     <p className="text-[9px] sm:text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 sm:mb-2 text-gray-400">Prazos Expirados</p>
                     <p className="text-lg sm:text-xl font-bold text-gray-800">{metricas.expiradosMes}</p>
+                    {metricas.expiradosMes > 0 && (
+                        <span className="text-[10px] sm:text-xs text-orange-600 mt-0.5 group-hover:underline">
+                            Ver na lista
+                        </span>
+                    )}
                     <p className="hidden sm:block text-xs text-gray-400 mt-0.5">No mês atual</p>
                 </div>
                 {/* Por operador */}
@@ -720,6 +729,7 @@ export default function EstoquePage() {
     const [loading, setLoading] = useState(true);
     const [atualizando, setAtualizando] = useState<string | null>(null);
     const [tabAtiva, setTabAtiva] = useState<'fila' | 'liberados' | 'sem_estoque' | 'finalizados'>('fila');
+    const [filtroExpirados, setFiltroExpirados] = useState(false);
     const [sucesso, setSucesso] = useState('');
     const [erro, setErro] = useState('');
 
@@ -745,10 +755,10 @@ export default function EstoquePage() {
                 return (agora - new Date(t.data_troca).getTime() > limitMs);
             });
             if (expirados.length > 0) {
-                await Promise.all(expirados.map((t) => atualizarStatusSupabase(t.id, 'retirado', true)));
+                await Promise.all(expirados.map((t) => atualizarStatusSupabase(t.id, 'liberado_retirada', true)));
                 const idsExpirados = new Set(expirados.map((t) => t.id));
                 setTrocas(data.map((t) =>
-                    idsExpirados.has(t.id) ? { ...t, status: 'retirado' as StatusEstoque, prazo_expirado: true } : t
+                    idsExpirados.has(t.id) ? { ...t, prazo_expirado: true } : t
                 ));
             } else {
                 setTrocas(data);
@@ -883,7 +893,7 @@ export default function EstoquePage() {
     }
 
     const emAndamento = trocas.filter((t) => t.status === 'pedido_em_andamento');
-    const liberados = trocas.filter((t) => t.status === 'liberado_retirada');
+    const liberados = trocas.filter((t) => t.status === 'liberado_retirada' && (!filtroExpirados || t.prazo_expirado));
     const semEstoque = trocas.filter((t) => t.status === 'sem_estoque');
     const finalizados = trocas.filter((t) => t.status === 'retirado');
 
@@ -1016,14 +1026,23 @@ export default function EstoquePage() {
                 </div>
 
                 {/* KPI Cards — SLA e Métricas */}
-                <SlaKpiPanel trocas={trocas} />
+                <SlaKpiPanel
+                    trocas={trocas}
+                    onCliqueExpirados={() => {
+                        setTabAtiva('liberados');
+                        setFiltroExpirados(true);
+                    }}
+                />
 
                 {/* Navegação de tabs */}
                 <div className="flex gap-1 mb-4 border-b border-gray-200 overflow-x-auto no-scrollbar scroll-smooth">
                     {tabs.map((tab) => (
                         <button
                             key={tab.key}
-                            onClick={() => setTabAtiva(tab.key)}
+                            onClick={() => {
+                                setTabAtiva(tab.key);
+                                setFiltroExpirados(false);
+                            }}
                             className={`px-4 py-2 text-sm font-medium border-b-2 transition-colors -mb-px whitespace-nowrap shrink-0 ${tabAtiva === tab.key
                                 ? 'border-gray-800 text-gray-800'
                                 : 'border-transparent text-gray-400 hover:text-gray-600'
@@ -1038,6 +1057,21 @@ export default function EstoquePage() {
                         </button>
                     ))}
                 </div>
+
+                {/* Filtro ativo banner */}
+                {filtroExpirados && tabAtiva === 'liberados' && (
+                    <div className="mb-4 flex items-center justify-between bg-orange-50 border border-orange-200 rounded-lg px-4 py-2">
+                        <span className="text-xs text-orange-800 font-medium">
+                            Exibindo apenas pedidos com <strong>prazo de retirada expirado</strong>
+                        </span>
+                        <button
+                            onClick={() => setFiltroExpirados(false)}
+                            className="text-xs text-orange-600 hover:text-orange-800 font-bold underline"
+                        >
+                            Limpar filtro
+                        </button>
+                    </div>
+                )}
 
                 {/* Lista de pedidos */}
                 {loading ? (
