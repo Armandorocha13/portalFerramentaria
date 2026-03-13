@@ -42,10 +42,19 @@ async function withRetry<T>(fn: () => Promise<T>, retries = 3, delay = 1000): Pr
     }
 }
 
-export async function importCargaSaldo() {
-    console.log("Iniciando atualização de carga (ANIEL_Saldo Volante.xlsx)...");
+import { backupCarga } from './backup_carga.js';
 
-    const filePath = path.resolve(__dirname, '..', 'BaseDeDados', 'ANIEL_Saldo Volante.xlsx');
+export async function importCargaSaldo() {
+    console.log("Iniciando atualização de carga (SALDO VOLANTE.xlsx)...");
+
+    // Realizar backup automático antes de começar
+    try {
+        await backupCarga();
+    } catch (e) {
+        console.warn("⚠️ Aviso: Falha ao realizar backup preventivo, mas prosseguindo com a carga...");
+    }
+
+    const filePath = 'C:\\Users\\user\\Desktop\\planilhas\\SALDO VOLANTE.xlsx';
     if (!fs.existsSync(filePath)) {
         throw new Error(`Arquivo não encontrado: ${filePath}`);
     }
@@ -57,63 +66,65 @@ export async function importCargaSaldo() {
     const setNomesValidos = new Set(tecsDb?.map(t => String(t.nome).trim().toUpperCase()) || []);
     console.log(`- ${setMatriculasValidas.size} técnicos encontrados para filtragem.`);
 
-    // 2. Carregar mapeamento de nomes -> matrículas
-    const wbEquipes = xlsx.readFile(path.resolve(__dirname, '..', 'BaseDeDados', 'EQUIPES.xlsx'));
-    const dbEquipes = xlsx.utils.sheet_to_json(wbEquipes.Sheets['SINAPSE'], { header: 1, defval: '' }).slice(1);
+    // 2. Carregar mapeamento de nomes -> matrículas (Usando a base atualizada)
+    const equipesPath = 'C:\\Users\\user\\Desktop\\planilhas\\BASE_COMPLETA_EQUIPES_ATUALIZADA.xlsx';
+    const wbEquipes = xlsx.readFile(equipesPath);
+    const dbEquipes = xlsx.utils.sheet_to_json(wbEquipes.Sheets[wbEquipes.SheetNames[0]], { header: 1, defval: '' }).slice(1);
     const mapGeralNomesMatriculas = new Map();
     dbEquipes.forEach((r: any) => {
-        const matriculaCorreta = String(r[0]).trim();
-        const nome = String(r[1]).trim().toUpperCase();
+        const matriculaCorreta = String(r[0]).trim(); // Matrícula na Col A
+        const nome = String(r[1]).trim().toUpperCase(); // Nome na Col B
         if (nome) mapGeralNomesMatriculas.set(nome, matriculaCorreta);
     });
 
     // 3. Ler Saldo Volante e DEDUPLICAR / SOMAR saldos
     const workbook = xlsx.readFile(filePath);
-    const sheet = workbook.Sheets['SINAPSE'];
-    const dataRows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' }).slice(5);
+    const sheet = workbook.Sheets[workbook.SheetNames[0]];
+    const dataRows = xlsx.utils.sheet_to_json(sheet, { header: 1, defval: '' }).slice(1); // Começa na L2
 
     const mapDeduplicar = new Map();
 
     for (const r of dataRows as any[]) {
-        const nomeTec = String(r[6] || '').trim();
-        if (!nomeTec || nomeTec === 'Nome da Equipe') continue;
+        const nomeTec = String(r[6] || '').trim(); // Col G
+        if (!nomeTec || nomeTec === 'Equipe') continue;
 
         const nomeUpper = nomeTec.toUpperCase();
-        const matriculaOficial = mapGeralNomesMatriculas.get(nomeUpper) || String(r[5] || '').trim();
+        // Tenta pegar matrícula da Col E ou F, ou do mapa se necessário
+        const matriculaPlanilha = String(r[4] || r[5] || '').trim();
+        const matriculaOficial = mapGeralNomesMatriculas.get(nomeUpper) || matriculaPlanilha;
 
         if (!setMatriculasValidas.has(matriculaOficial) && !setNomesValidos.has(nomeUpper)) continue;
 
-        const codigoMat = String(r[8] || '').trim();
+        const codigoMat = String(r[8] || '').trim(); // Col I
         if (!codigoMat) continue;
 
-        const saldoStr = String(r[19] || '0').replace('.', '').replace(',', '.');
+        // Saldo na Col U (índice 20) ou similar
+        const saldoStr = String(r[20] || '0').replace('.', '').replace(',', '.');
         const saldoFloat = parseFloat(saldoStr) || 0;
 
-        // Se o saldo for 0, ignoramos
         if (saldoFloat <= 0) continue;
 
-        const valorTotalStr = String(r[21] || '0').replace('.', '').replace(',', '.');
-        const valorTotal = parseFloat(valorTotalStr) || 0;
-        const valorUnitStr = String(r[20] || '0').replace('.', '').replace(',', '.');
+        const valorUnitStr = String(r[21] || '0').replace('.', '').replace(',', '.');
         const valorUnit = parseFloat(valorUnitStr) || 0;
+        const valorTotal = saldoFloat * valorUnit;
 
         // Chave única: Matrícula + Código do Material
         const uniqueKey = `${matriculaOficial}_${codigoMat}`;
 
         if (mapDeduplicar.has(uniqueKey)) {
             const existing = mapDeduplicar.get(uniqueKey);
-            existing.saldo = (parseFloat(existing.saldo.replace(',', '.')) + saldoFloat).toFixed(2).replace('.', ',');
-            existing.valor_total = (parseFloat(existing.valor_total.replace(',', '.')) + valorTotal).toFixed(2).replace('.', ',');
-            // Valor unitário mantemos o do primeiro item ou média? Mantemos o primeiro.
-            existing.valor = valorUnit;
+            const currentSaldo = parseFloat(existing.saldo.replace(',', '.'));
+            const currentTotal = parseFloat(existing.valor_total.replace(',', '.'));
+            existing.saldo = (currentSaldo + saldoFloat).toFixed(2).replace('.', ',');
+            existing.valor_total = (currentTotal + valorTotal).toFixed(2).replace('.', ',');
         } else {
             mapDeduplicar.set(uniqueKey, {
-                contrato_origem: String(r[0] || '').trim(),
+                contrato_origem: String(r[1] || '').trim(), // Col B: FERRAMENTAL VITÓRIA/ETC
                 matricula_tecnico: matriculaOficial,
                 nome_tecnico: nomeTec,
                 codigo_material: codigoMat,
-                descricao_material: String(r[9] || '').trim(),
-                unidade: String(r[12] || '').trim(),
+                descricao_material: String(r[9] || '').trim(), // Col J
+                unidade: String(r[12] || '').trim(), // Col M
                 saldo: saldoFloat.toFixed(2).replace('.', ','),
                 valor_total: valorTotal.toFixed(2).replace('.', ','),
                 valor: valorUnit

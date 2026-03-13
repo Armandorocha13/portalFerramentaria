@@ -8,6 +8,7 @@ dist/
 .env
 .env.local
 .env.*.local
+scripts/.env
 
 # Logs
 *.log
@@ -29,9 +30,9 @@ __pycache__/
 venv_mcp/
 .venv/
 
-# Arquivos de dados brutos (não devem entrar no repositório)
+# Arquivos de dados brutos e backups
 *.xlsx
 *.csv
-scripts/data/*.txt
+scripts/data/
 carga_consolidada*
 sup.xlsx

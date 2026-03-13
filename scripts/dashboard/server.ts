@@ -62,6 +62,14 @@ app.get('/api/run/sincronizar', (req, res) => {
     runScript('npx ts-node --esm scripts/database/executar_sync.ts', res);
 });
 
+app.get('/api/run/carga-saldo', (req, res) => {
+    runScript('npx ts-node --esm scripts/database/import_carga_saldo.ts', res);
+});
+
+app.get('/api/run/backup-carga', (req, res) => {
+    runScript('npx ts-node --esm scripts/database/backup_carga.ts', res);
+});
+
 app.get('/api/run/all', (req, res) => {
      res.setHeader('Content-Type', 'text/event-stream');
      res.setHeader('Cache-Control', 'no-cache');
