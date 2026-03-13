@@ -3,9 +3,9 @@ import * as fs from 'fs';
 import * as path from 'path';
 
 async function processRelacoes() {
-    const supervisoresPath = 'c:/Users/user/Desktop/portalFerramentaria/updated_supervisores_lista.txt';
-    const relacoesPath = 'c:/Users/user/Desktop/portalFerramentaria/relacoes.csv';
-    const updateBaseSqlPath = 'c:/Users/user/Desktop/portalFerramentaria/scripts/sql/update_base_real.sql';
+    const supervisoresPath = path.join(__dirname, 'data', 'updated_supervisores_lista.txt');
+    const relacoesPath = path.join(__dirname, 'data', 'relacoes.csv');
+    const updateBaseSqlPath = path.join(__dirname, 'sql', 'update_base_real.sql');
 
     // 1. Load Supervisores Map (Name -> Matricula)
     const supervisoresLines = fs.readFileSync(supervisoresPath, 'utf8').split('\n').filter(Boolean);

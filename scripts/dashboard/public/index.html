@@ -1,0 +1,172 @@
+
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sincronização Portal Ferramentaria</title>
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --text: #1e293b;
+            --terminal-bg: #0f172a;
+            --terminal-text: #38bdf8;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: var(--bg);
+            color: var(--text);
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .container {
+            max-width: 900px;
+            width: 100%;
+        }
+        header {
+            margin-bottom: 30px;
+            text-align: center;
+        }
+        .card {
+            background: var(--card);
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1);
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+        .actions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        button {
+            padding: 12px 20px;
+            border-radius: 8px;
+            border: none;
+            background-color: var(--primary);
+            color: white;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 14px;
+        }
+        button:hover {
+            opacity: 0.9;
+            transform: translateY(-1px);
+        }
+        button:disabled {
+            background-color: #94a3b8;
+            cursor: not-allowed;
+            transform: none;
+        }
+        button.all {
+            background-color: #059669;
+        }
+        .terminal {
+            background-color: var(--terminal-bg);
+            color: var(--terminal-text);
+            border-radius: 8px;
+            padding: 20px;
+            height: 400px;
+            overflow-y: auto;
+            font-family: "Fira Code", "Courier New", monospace;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-wrap;
+            border: 1px solid #1e293b;
+        }
+        .terminal::-webkit-scrollbar {
+            width: 8px;
+        }
+        .terminal::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+        .status-dot {
+            display: inline-block;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #ef4444;
+            margin-right: 5px;
+        }
+        .status-dot.online {
+            background: #10b981;
+        }
+        .log-error { color: #f87171; }
+        .log-info { color: #fbbf24; }
+        .log-header { color: #c084fc; font-weight: bold; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>⚙️ Painel de Sincronização</h1>
+            <p><span class="status-dot online"></span> Localhost Dashboard v1.0</p>
+        </header>
+
+        <div class="card">
+            <h3>Ações Disponíveis</h3>
+            <div class="actions">
+                <button onclick="runStep('consolidar', this)">1. Consolidar Excel</button>
+                <button onclick="runStep('preparar-csv', this)">2. Preparar CSV</button>
+                <button onclick="runStep('sincronizar', this)">3. Subir p/ Supabase</button>
+                <button class="all" onclick="runStep('all', this)">🚀 Rodar Tudo</button>
+            </div>
+            <button style="background: #64748b;" onclick="clearTerminal()">Limpar Console</button>
+        </div>
+
+        <div class="terminal" id="console">--- Aguardando início ---</div>
+    </div>
+
+    <script>
+        const consoleEl = document.getElementById('console');
+        let currentEventSource = null;
+
+        function appendLog(text, type = '') {
+            const span = document.createElement('span');
+            if (type) span.className = `log-${type}`;
+            span.textContent = text;
+            consoleEl.appendChild(span);
+            consoleEl.scrollTop = consoleEl.scrollHeight;
+        }
+
+        function clearTerminal() {
+            consoleEl.textContent = '';
+        }
+
+        function runStep(endpoint, btn) {
+            if (currentEventSource) currentEventSource.close();
+            
+            setButtonsDisabled(true);
+            appendLog(`\n> Iniciando: ${endpoint}...\n`, 'header');
+
+            const eventSource = new EventSource(`/api/run/${endpoint}`);
+            currentEventSource = eventSource;
+
+            eventSource.onmessage = function(event) {
+                const data = JSON.parse(event.data);
+                appendLog(data.log, data.type);
+            };
+
+            eventSource.onerror = function() {
+                eventSource.close();
+                setButtonsDisabled(false);
+                appendLog('\n--- Conexão finalizada ---\n', 'info');
+            };
+        }
+
+        function setButtonsDisabled(disabled) {
+            document.querySelectorAll('button').forEach(b => {
+                if (b.textContent !== 'Limpar Console') b.disabled = disabled;
+            });
+        }
+    </script>
+</body>
+</html>

@@ -64,7 +64,7 @@ async function importFinal() {
     const mapSupsByMatricula = new Map();
     const mapSupsByName = new Map();
 
-    const txtPath = path.resolve(__dirname, 'supervisores_lista.txt');
+    const txtPath = path.resolve(__dirname, 'data', 'supervisores_lista.txt');
     if (fs.existsSync(txtPath)) {
         const lines = fs.readFileSync(txtPath, 'utf8').split('\n').filter(Boolean);
         lines.forEach(l => {

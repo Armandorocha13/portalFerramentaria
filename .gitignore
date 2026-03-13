@@ -20,9 +20,18 @@ npm-debug.log*
 # Sistema
 .DS_Store
 Thumbs.db
+*.tsbuildinfo
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+venv_mcp/
+.venv/
 
 # Arquivos de dados brutos (não devem entrar no repositório)
 *.xlsx
 *.csv
+scripts/data/*.txt
 carga_consolidada*
 sup.xlsx
