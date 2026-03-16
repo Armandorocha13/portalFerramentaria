@@ -763,8 +763,8 @@ export default function EstoquePage() {
     const [salvandoSenha, setSalvandoSenha] = useState(false);
     const [atualizandoCarga, setAtualizandoCarga] = useState(false);
 
-    const fetchTrocas = useCallback(async () => {
-        setLoading(true);
+    const fetchTrocas = useCallback(async (silent = false) => {
+        if (!silent) setLoading(true);
         try {
             const data = await getTrocasSupabase();
             const agora = Date.now();
@@ -795,7 +795,7 @@ export default function EstoquePage() {
         let interval: ReturnType<typeof setInterval> | null = null;
 
         const startPolling = () => {
-            if (!interval) interval = setInterval(fetchTrocas, 30_000);
+            if (!interval) interval = setInterval(() => fetchTrocas(true), 30_000);
         };
 
         const stopPolling = () => {
@@ -809,13 +809,13 @@ export default function EstoquePage() {
             if (document.hidden) {
                 stopPolling();
             } else {
-                fetchTrocas(); // Refresh imediato ao voltar para aba
+                fetchTrocas(true); // Refresh silencioso ao voltar para aba
                 startPolling();
             }
         };
 
         // Boot inicial
-        fetchTrocas();
+        fetchTrocas(false);
         if (!document.hidden) startPolling();
 
         document.addEventListener('visibilitychange', handleVisibilityChange);
@@ -955,7 +955,7 @@ export default function EstoquePage() {
                             Online
                         </span>
                         <button
-                            onClick={fetchTrocas}
+                            onClick={() => fetchTrocas(false)}
                             disabled={loading}
                             title="Atualizar"
                             className="p-2 rounded-lg text-gray-500 hover:bg-gray-100 transition-colors disabled:opacity-50"
