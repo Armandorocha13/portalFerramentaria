@@ -611,7 +611,7 @@ function TrocasList({
 }
 
 // ---- Painel SLA e Métricas ----
-function SlaKpiPanel({ trocas, onCliqueExpirados, onCliqueCancelados }: { trocas: Troca[]; onCliqueExpirados?: () => void; onCliqueCancelados?: () => void }) {
+function SlaKpiPanel({ trocas, onCliqueExpirados }: { trocas: Troca[]; onCliqueExpirados?: () => void }) {
     const [mostrarOperadores, setMostrarOperadores] = useState(false);
 
     const metricas = useMemo(() => {
@@ -680,7 +680,7 @@ function SlaKpiPanel({ trocas, onCliqueExpirados, onCliqueCancelados }: { trocas
 
     return (
         <div className="mb-6">
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                 {/* SLA */}
                 <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 hover:border-gray-300 transition-colors">
                     <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">SLA Médio  </p>
@@ -702,15 +702,7 @@ function SlaKpiPanel({ trocas, onCliqueExpirados, onCliqueCancelados }: { trocas
                     <p className="text-lg sm:text-xl font-bold text-gray-800">{metricas.expiradosMes}</p>
                     <p className="text-[10px] text-orange-600 mt-1 group-hover:underline">No mês atual</p>
                 </div>
-                {/* Cancelados */}
-                <div
-                    onClick={onCliqueCancelados}
-                    className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 relative cursor-pointer hover:border-red-300 transition-all group"
-                >
-                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Cancelados (Mês)</p>
-                    <p className="text-lg sm:text-xl font-bold text-gray-800">{metricas.canceladosMes}</p>
-                    <p className="text-[10px] text-red-500 mt-1 group-hover:underline">Cancelados no mês</p>
-                </div>
+
                 {/* Por operador */}
                 <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 hover:border-gray-300 transition-colors relative">
                     <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Operadores</p>
@@ -1080,9 +1072,7 @@ export default function EstoquePage() {
                         setTabAtiva('liberados');
                         setFiltroExpirados(true);
                     }}
-                    onCliqueCancelados={() => {
-                        setTabAtiva('cancelados');
-                    }}
+
                 />
 
                 {/* Navegação de tabs */}
