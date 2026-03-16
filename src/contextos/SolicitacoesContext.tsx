@@ -3,7 +3,7 @@
 // ============================================================
 
 import { createContext, useContext, useState, useCallback, type ReactNode } from 'react';
-import type { SolicitacaoTroca, SolicitacaoStatus } from '../types';
+import type { SolicitacaoTroca, SolicitacaoStatus } from '../tipos';
 
 interface SolicitacoesContextData {
     solicitacoes: SolicitacaoTroca[];

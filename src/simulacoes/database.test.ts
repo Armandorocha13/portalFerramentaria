@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calcularPrazoD1 } from '../mocks/database'; // Importamos de onde a função foi documentada
+import { calcularPrazoD1 } from './database'; // Importamos de onde a função foi documentada
 
 describe('calcularPrazoD1', () => {
     it('deve adicionar 1 dia útil a uma terça-feira', () => {
