@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // PÁGINA DO SUPERVISOR — Formulário de Troca em 5 Etapas
 // Design minimalista funcional
 // ============================================================
@@ -31,6 +31,7 @@ function StatusBadge({ status }: { status: string }) {
         aprovada: { label: 'Liberado p/ retirada', cls: 'bg-green-50 text-green-700 border-green-200', dot: 'bg-green-500' },
         rejeitada: { label: 'Sem estoque', cls: 'bg-red-50 text-red-700 border-red-200', dot: 'bg-red-500' },
         concluida: { label: 'Finalizado', cls: 'bg-gray-100 text-gray-500 border-gray-200', dot: 'bg-gray-400' },
+        cancelado: { label: 'Cancelado', cls: 'bg-red-50 text-red-600 border-red-100', dot: 'bg-red-400' },
     };
     const c = config[status] ?? config.pedido_em_andamento;
     return (

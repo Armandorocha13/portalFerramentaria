@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-import { importCargaSaldo } from './scripts/import_carga_saldo'
+import { importCargaSaldo } from './scripts/database/import_carga_saldo'
 
 export default defineConfig({
   plugins: [

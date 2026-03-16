@@ -1,4 +1,4 @@
-﻿// ============================================================
+// ============================================================
 // PÁGINA DO ESTOQUE — Painel de Controle da Ferramentaria
 // Design minimalista funcional
 // ============================================================
@@ -8,7 +8,7 @@ import { useAuth } from '../contextos/AuthContext';
 import { supabase } from '../bibliotecas/supabase';
 import { useDebounce } from '../ganchos/useDebounce';
 
-type StatusEstoque = 'pedido_em_andamento' | 'sem_estoque' | 'liberado_retirada' | 'retirado';
+type StatusEstoque = 'pedido_em_andamento' | 'sem_estoque' | 'liberado_retirada' | 'retirado' | 'cancelado';
 
 interface Troca {
     id: string;
@@ -64,6 +64,7 @@ const LABEL_STATUS: Record<StatusEstoque, string> = {
     sem_estoque: 'Sem estoque',
     liberado_retirada: 'Liberado p/ retirada',
     retirado: 'Finalizado',
+    cancelado: 'Cancelado',
 };
 
 // ---- Badge de Status ----
@@ -73,12 +74,14 @@ function StatusBadge({ status }: { status: StatusEstoque }) {
         sem_estoque: 'bg-red-50 text-red-700 border-red-200',
         liberado_retirada: 'bg-green-50 text-green-700 border-green-200',
         retirado: 'bg-gray-100 text-gray-500 border-gray-200',
+        cancelado: 'bg-red-50 text-red-600 border-red-100',
     };
     const dots: Record<StatusEstoque, string> = {
         pedido_em_andamento: 'bg-blue-500',
         sem_estoque: 'bg-red-500',
         liberado_retirada: 'bg-green-500',
         retirado: 'bg-gray-400',
+        cancelado: 'bg-red-400',
     };
     return (
         <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full border ${styles[status]}`}>
@@ -160,6 +163,7 @@ function TrocaCard({
     const [statusSelecionado, setStatusSelecionado] = useState<StatusEstoque>(troca.status);
     const [confirmando, setConfirmando] = useState(false);
     const [confirmandoRetirada, setConfirmandoRetirada] = useState(false);
+    const [confirmandoCancelamento, setConfirmandoCancelamento] = useState(false);
 
     // Sincroniza o select quando o status muda externamente (ex: polling)
     useEffect(() => {
@@ -172,10 +176,11 @@ function TrocaCard({
     });
 
     function handleConfirmar() {
-        const novoStatus: StatusEstoque = confirmandoRetirada ? 'retirado' : statusSelecionado;
+        const novoStatus: StatusEstoque = confirmandoCancelamento ? 'cancelado' : confirmandoRetirada ? 'retirado' : statusSelecionado;
         onAtualizarStatus(troca.id, novoStatus);
         setConfirmando(false);
         setConfirmandoRetirada(false);
+        setConfirmandoCancelamento(false);
     }
 
     return (
@@ -244,19 +249,23 @@ function TrocaCard({
                     </div>
                 ) : troca.status === 'retirado' ? (
                     <span className="text-sm text-green-600 font-medium">✓ Retirada confirmada — pedido finalizado</span>
+                ) : troca.status === 'cancelado' ? (
+                    <span className="text-sm text-red-500 font-medium">✕ Pedido cancelado</span>
                 ) : confirmando ? (
                     <div className="flex flex-col gap-3 bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 shadow-inner">
                         <span className="text-sm text-gray-700">
-                            {confirmandoRetirada
-                                ? 'Confirmar retirada do item? Isso irá finalizar o pedido.'
-                                : <>Confirmar mudança para: <strong>{LABEL_STATUS[statusSelecionado]}</strong>?</>}
+                            {confirmandoCancelamento
+                                ? 'Tem certeza que deseja cancelar este pedido?'
+                                : confirmandoRetirada
+                                    ? 'Confirmar retirada do item? Isso irá finalizar o pedido.'
+                                    : <>Confirmar mudança para: <strong>{LABEL_STATUS[statusSelecionado]}</strong>?</>}
                         </span>
                         <div className="flex items-center justify-end gap-2 shrink-0">
                             <button
-                                onClick={() => { setConfirmando(false); setConfirmandoRetirada(false); }}
+                                onClick={() => { setConfirmando(false); setConfirmandoRetirada(false); setConfirmandoCancelamento(false); }}
                                 className="text-xs px-3 py-1.5 rounded-lg border border-gray-200 text-gray-600 bg-white hover:bg-gray-100 transition-colors"
                             >
-                                Cancelar
+                                Voltar
                             </button>
                             <button
                                 onClick={handleConfirmar}
@@ -287,12 +296,20 @@ function TrocaCard({
                             </button>
                         </div>
                         {troca.status === 'liberado_retirada' && (
-                            <button
-                                onClick={() => { setConfirmandoRetirada(true); setConfirmando(true); }}
-                                className="text-xs px-4 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
-                            >
-                                ✓ Confirmar Retirada
-                            </button>
+                            <div className="flex items-center gap-2 lg:ml-auto">
+                                <button
+                                    onClick={() => { setConfirmandoCancelamento(true); setConfirmando(true); }}
+                                    className="text-xs px-4 py-1.5 rounded-lg border border-red-200 text-red-600 hover:bg-red-50 transition-colors"
+                                >
+                                    ✕ Cancelar Pedido
+                                </button>
+                                <button
+                                    onClick={() => { setConfirmandoRetirada(true); setConfirmando(true); }}
+                                    className="text-xs px-4 py-1.5 rounded-lg bg-green-600 text-white hover:bg-green-700 transition-colors"
+                                >
+                                    ✓ Confirmar Retirada
+                                </button>
+                            </div>
                         )}
                     </div>
                 )}
@@ -314,7 +331,7 @@ function TrocasList({
     isUpdatingCarga,
 }: {
     trocas: Troca[];
-    tabAtiva: 'fila' | 'liberados' | 'sem_estoque' | 'finalizados';
+    tabAtiva: 'fila' | 'liberados' | 'sem_estoque' | 'finalizados' | 'cancelados';
     atualizando: string | null;
     onAtualizarStatus: (id: string, status: StatusEstoque, expirado?: boolean) => void;
     todosOsDados: Troca[];
@@ -418,6 +435,7 @@ function TrocasList({
         liberados: 'Nenhum pedido liberado',
         sem_estoque: 'Sem registros de falta de estoque',
         finalizados: 'Nenhum pedido finalizado ainda',
+        cancelados: 'Nenhum pedido cancelado encontrado',
     };
 
     return (
@@ -492,6 +510,7 @@ function TrocasList({
                                 <option value="liberado_retirada">Liberados</option>
                                 <option value="sem_estoque">Sem estoque</option>
                                 <option value="retirado">Finalizados</option>
+                                <option value="cancelado">Cancelados</option>
                             </select>
                         </div>
                     </div>
@@ -592,7 +611,7 @@ function TrocasList({
 }
 
 // ---- Painel SLA e Métricas ----
-function SlaKpiPanel({ trocas, onCliqueExpirados }: { trocas: Troca[]; onCliqueExpirados?: () => void }) {
+function SlaKpiPanel({ trocas, onCliqueExpirados, onCliqueCancelados }: { trocas: Troca[]; onCliqueExpirados?: () => void; onCliqueCancelados?: () => void }) {
     const [mostrarOperadores, setMostrarOperadores] = useState(false);
 
     const metricas = useMemo(() => {
@@ -639,7 +658,14 @@ function SlaKpiPanel({ trocas, onCliqueExpirados }: { trocas: Troca[]; onCliqueE
         );
         const expiradosMes = expiradosLista.length;
 
-        // 4. Atendimentos por operador (últimos 30 dias)
+        // 4. Cancelados no mês
+        const canceladosLista = trocas.filter(t =>
+            t.status === 'cancelado' &&
+            new Date(t.data_troca) >= inicioMes
+        );
+        const canceladosMes = canceladosLista.length;
+
+        // 5. Atendimentos por operador (últimos 30 dias)
         const porOperador = new Map<string, number>();
         for (const t of atendidos30d) {
             if (t.atendido_por) {
@@ -649,50 +675,52 @@ function SlaKpiPanel({ trocas, onCliqueExpirados }: { trocas: Troca[]; onCliqueE
         const operadores = Array.from(porOperador.entries())
             .sort((a, b) => b[1] - a[1]);
 
-        return { slaFormatado, atendidosHoje, expiradosMes, expiradosLista, operadores, totalOperadores: operadores.length };
+        return { slaFormatado, atendidosHoje, expiradosMes, expiradosLista, canceladosMes, canceladosLista, operadores, totalOperadores: operadores.length };
     }, [trocas]);
 
     return (
         <div className="mb-6">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
                 {/* SLA */}
-                <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
-                    <p className="text-[9px] sm:text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 sm:mb-2">⏱ SLA Médio (30d)</p>
+                <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 hover:border-gray-300 transition-colors">
+                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">SLA Médio  </p>
                     <p className="text-lg sm:text-xl font-bold text-gray-800">{metricas.slaFormatado}</p>
-                    <p className="hidden sm:block text-xs text-gray-400 mt-0.5">Tempo médio de atendimento</p>
+                    <p className="hidden sm:block text-[10px] text-gray-400 mt-1">Tempo médio de atendimento</p>
                 </div>
                 {/* Atendidos hoje */}
-                <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4">
-                    <p className="text-[9px] sm:text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 sm:mb-2 text-gray-400">Atendidos Hoje</p>
+                <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 hover:border-gray-300 transition-colors">
+                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Atendidos Hoje</p>
                     <p className="text-lg sm:text-xl font-bold text-gray-800">{metricas.atendidosHoje}</p>
-                    <p className="hidden sm:block text-xs text-gray-400 mt-0.5">Pedidos atendidos hoje</p>
+                    <p className="hidden sm:block text-[10px] text-gray-400 mt-1">Pedidos concluídos hoje</p>
                 </div>
                 {/* Prazos expirados */}
                 <div
                     onClick={onCliqueExpirados}
-                    className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 relative cursor-pointer hover:border-orange-300 transition-colors group"
+                    className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 relative cursor-pointer hover:border-orange-300 transition-all group"
                 >
-                    <p className="text-[9px] sm:text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 sm:mb-2 text-gray-400">Prazos Expirados</p>
+                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Prazos Expirados</p>
                     <p className="text-lg sm:text-xl font-bold text-gray-800">{metricas.expiradosMes}</p>
-                    {metricas.expiradosMes > 0 && (
-                        <span className="text-[10px] sm:text-xs text-orange-600 mt-0.5 group-hover:underline">
-                            Ver na lista
-                        </span>
-                    )}
-                    <p className="hidden sm:block text-xs text-gray-400 mt-0.5">No mês atual</p>
+                    <p className="text-[10px] text-orange-600 mt-1 group-hover:underline">No mês atual</p>
+                </div>
+                {/* Cancelados */}
+                <div
+                    onClick={onCliqueCancelados}
+                    className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 relative cursor-pointer hover:border-red-300 transition-all group"
+                >
+                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Cancelados (Mês)</p>
+                    <p className="text-lg sm:text-xl font-bold text-gray-800">{metricas.canceladosMes}</p>
+                    <p className="text-[10px] text-red-500 mt-1 group-hover:underline">Cancelados no mês</p>
                 </div>
                 {/* Por operador */}
-                <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 relative">
-                    <p className="text-[9px] sm:text-[10px] font-semibold text-gray-400 uppercase tracking-wider mb-1 sm:mb-2 text-gray-400">Operadores</p>
-                    <p className="text-lg sm:text-xl font-bold text-gray-800">{metricas.totalOperadores}</p>
-                    {metricas.operadores.length > 0 && (
-                        <button
-                            onClick={() => setMostrarOperadores(!mostrarOperadores)}
-                            className="text-[10px] sm:text-xs text-gray-500 mt-0.5 hover:text-gray-700 transition-colors underline"
-                        >
-                            {mostrarOperadores ? 'Ocultar' : 'Ver detalhes'}
-                        </button>
-                    )}
+                <div className="bg-white border border-gray-200 rounded-xl p-3 sm:p-4 hover:border-gray-300 transition-colors relative">
+                    <p className="text-[9px] sm:text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-2">Operadores</p>
+                    <p className="text-lg sm:text-xl font-bold text-gray-800">{metricas.totalOperadores}  </p>
+                    <button
+                        onClick={() => setMostrarOperadores(!mostrarOperadores)}
+                        className="text-[10px] text-gray-500 mt-1 hover:text-gray-700 font-medium underline"
+                    >
+                        {mostrarOperadores ? 'Ocultar' : 'Ver ranking'}
+                    </button>
                 </div>
             </div>
 
@@ -703,7 +731,7 @@ function SlaKpiPanel({ trocas, onCliqueExpirados }: { trocas: Troca[]; onCliqueE
                         <thead className="border-b border-gray-100 bg-gray-50">
                             <tr>
                                 <th className="px-4 py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider">Operador</th>
-                                <th className="px-4 py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider text-right">Atendimentos (30d)</th>
+                                <th className="px-4 py-2.5 text-[10px] font-semibold text-gray-400 uppercase tracking-wider text-right">Atendimentos  </th>
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-gray-50">
@@ -728,7 +756,7 @@ export default function EstoquePage() {
     const [trocas, setTrocas] = useState<Troca[]>([]);
     const [loading, setLoading] = useState(true);
     const [atualizando, setAtualizando] = useState<string | null>(null);
-    const [tabAtiva, setTabAtiva] = useState<'fila' | 'liberados' | 'sem_estoque' | 'finalizados'>('fila');
+    const [tabAtiva, setTabAtiva] = useState<'fila' | 'liberados' | 'sem_estoque' | 'finalizados' | 'cancelados'>('fila');
     const [filtroExpirados, setFiltroExpirados] = useState(false);
     const [sucesso, setSucesso] = useState('');
     const [erro, setErro] = useState('');
@@ -829,6 +857,7 @@ export default function EstoquePage() {
                 sem_estoque: 'Pedido marcado como Sem Estoque.',
                 liberado_retirada: 'Pedido liberado para retirada!',
                 retirado: 'Retirada confirmada!',
+                cancelado: 'Pedido cancelado com sucesso.',
             };
             setSucesso(mensagens[novoStatus]);
             setTimeout(() => setSucesso(''), 3000);
@@ -896,18 +925,21 @@ export default function EstoquePage() {
     const liberados = trocas.filter((t) => t.status === 'liberado_retirada' && (!filtroExpirados || t.prazo_expirado));
     const semEstoque = trocas.filter((t) => t.status === 'sem_estoque');
     const finalizados = trocas.filter((t) => t.status === 'retirado');
+    const cancelados = trocas.filter((t) => t.status === 'cancelado');
 
     const tabs: { key: typeof tabAtiva; label: string; count: number }[] = [
         { key: 'fila', label: 'Em Andamento', count: emAndamento.length },
         { key: 'liberados', label: 'Liberados', count: liberados.length },
         { key: 'sem_estoque', label: 'Sem Estoque', count: semEstoque.length },
         { key: 'finalizados', label: 'Finalizados', count: finalizados.length },
+        { key: 'cancelados', label: 'Cancelados', count: cancelados.length },
     ];
 
     const trocasAtuais = tabAtiva === 'fila' ? emAndamento
         : tabAtiva === 'liberados' ? liberados
             : tabAtiva === 'sem_estoque' ? semEstoque
-                : finalizados;
+                : tabAtiva === 'finalizados' ? finalizados
+                    : cancelados;
 
     return (
         <div className="min-h-screen bg-gray-50">
@@ -1009,20 +1041,36 @@ export default function EstoquePage() {
                 )}
 
                 {/* KPI Cards — Status */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-4">
-                    {tabs.map((tab) => (
-                        <button
-                            key={tab.key}
-                            onClick={() => setTabAtiva(tab.key)}
-                            className={`text-left bg-white border rounded-xl p-4 transition-all ${tabAtiva === tab.key
-                                ? 'border-gray-400 shadow-sm'
-                                : 'border-gray-200 hover:border-gray-300'
-                                }`}
-                        >
-                            <p className="text-2xl font-bold text-gray-800 mb-0.5">{tab.count}</p>
-                            <p className="text-xs text-gray-400 font-medium">{tab.label}</p>
-                        </button>
-                    ))}
+                <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-4">
+                    {tabs.map((tab) => {
+                        const colors: Record<string, string> = {
+                            fila: 'border-blue-200 text-blue-700 hover:border-blue-300',
+                            liberados: 'border-green-200 text-green-700 hover:border-green-300',
+                            sem_estoque: 'border-red-200 text-red-700 hover:border-red-300',
+                            finalizados: 'border-gray-200 text-gray-500 hover:border-gray-300',
+                            cancelados: 'border-rose-200 text-rose-600 hover:border-rose-300',
+                        };
+                        const activeColors: Record<string, string> = {
+                            fila: 'border-blue-500 ring-2 ring-blue-50 bg-blue-50',
+                            liberados: 'border-green-500 ring-2 ring-green-50 bg-green-50',
+                            sem_estoque: 'border-red-500 ring-2 ring-red-50 bg-red-50',
+                            finalizados: 'border-gray-800 ring-2 ring-gray-100 bg-gray-50',
+                            cancelados: 'border-rose-500 ring-2 ring-rose-50 bg-rose-50',
+                        };
+                        return (
+                            <button
+                                key={tab.key}
+                                onClick={() => { setTabAtiva(tab.key); setFiltroExpirados(false); }}
+                                className={`text-left bg-white border rounded-xl p-4 transition-all ${tabAtiva === tab.key
+                                    ? activeColors[tab.key]
+                                    : `border-gray-200 ${colors[tab.key]}`
+                                    }`}
+                            >
+                                <p className={`text-2xl font-bold mb-0.5 ${tabAtiva === tab.key ? 'text-gray-900' : 'text-gray-800'}`}>{tab.count}</p>
+                                <p className={`text-xs font-bold uppercase tracking-wider ${tabAtiva === tab.key ? 'text-gray-600' : 'text-gray-400'}`}>{tab.label}</p>
+                            </button>
+                        );
+                    })}
                 </div>
 
                 {/* KPI Cards — SLA e Métricas */}
@@ -1031,6 +1079,9 @@ export default function EstoquePage() {
                     onCliqueExpirados={() => {
                         setTabAtiva('liberados');
                         setFiltroExpirados(true);
+                    }}
+                    onCliqueCancelados={() => {
+                        setTabAtiva('cancelados');
                     }}
                 />
 
