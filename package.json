@@ -11,8 +11,9 @@
     "test:run": "vitest run",
     "test:coverage": "vitest run --coverage",
     "typecheck": "tsc --noEmit",
-    "api:start": "tsx scripts/api_server.ts",
-    "sync:mysql": "tsx scripts/automation_mysql_sync.ts"
+    "api:start": "tsx scripts/api/api_server.ts",
+    "sync:mysql": "tsx scripts/api/automation_mysql_sync.ts",
+    "dashboard:start": "tsx scripts/dashboard/server.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.27.1",
